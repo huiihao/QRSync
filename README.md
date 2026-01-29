@@ -23,7 +23,7 @@
 
 ## 🌐 在线体验
 
-**👉 [点击访问 QRSync_Offline](https://QRSync_Offline-demo.vercel.app)**
+**👉 [点击访问 QRSync_Offline](https://github.com/huiihao/QRSync_Offline/index.html)**
 
 > 页面加载完成后，即可断开网络离线使用。
 
