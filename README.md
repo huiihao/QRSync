@@ -1,0 +1,1 @@
+# QRSync_Offline
