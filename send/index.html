@@ -1,0 +1,1353 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QRSync_Offline - 发送端</title>
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+        
+        :root {
+            --bg: #f5f5f7;
+            --card-bg: rgba(255, 255, 255, 0.72);
+            --card-border: rgba(255, 255, 255, 0.5);
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --accent: #0071e3;
+            --accent-hover: #0077ed;
+            --success: #34c759;
+            --warning: #ff9500;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+            --shadow-hover: 0 12px 40px rgba(0, 0, 0, 0.12);
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.47059;
+            -webkit-font-smoothing: antialiased;
+            padding-bottom: 60px;
+        }
+        
+        /* Navigation */
+        nav {
+            position: sticky;
+            top: 0;
+            height: 52px;
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .nav-content {
+            width: 100%;
+            max-width: 1024px;
+            padding: 0 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .logo {
+            font-size: 21px;
+            font-weight: 600;
+            letter-spacing: -0.021em;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+        
+        .nav-links a {
+            color: var(--text-primary);
+            text-decoration: none;
+            font-size: 14px;
+            opacity: 0.8;
+            transition: opacity 0.3s;
+        }
+        
+        .nav-links a:hover {
+            opacity: 1;
+        }
+        
+        /* Container */
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        /* Header */
+        .page-header {
+            text-align: center;
+            margin-bottom: 48px;
+        }
+        
+        .page-header h1 {
+            font-size: 48px;
+            font-weight: 700;
+            letter-spacing: -0.003em;
+            margin-bottom: 12px;
+        }
+        
+        .page-header p {
+            font-size: 21px;
+            color: var(--text-secondary);
+            letter-spacing: -0.021em;
+        }
+        
+        /* Card */
+        .card {
+            background: var(--card-bg);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 32px;
+            margin-bottom: 24px;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        
+        .card:hover {
+            box-shadow: var(--shadow);
+        }
+        
+        .card-title {
+            font-size: 21px;
+            font-weight: 600;
+            margin-bottom: 24px;
+            letter-spacing: -0.021em;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .card-title .icon {
+            width: 36px;
+            height: 36px;
+            background: linear-gradient(135deg, var(--accent), #5ac8fa);
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        
+        /* Upload Area */
+        .upload-area {
+            border: 2px dashed rgba(0, 0, 0, 0.16);
+            border-radius: 20px;
+            padding: 60px 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.4);
+        }
+        
+        .upload-area:hover {
+            border-color: var(--accent);
+            background: rgba(0, 113, 227, 0.04);
+        }
+        
+        .upload-area.dragover {
+            border-color: var(--accent);
+            background: rgba(0, 113, 227, 0.08);
+        }
+        
+        .upload-area.has-file {
+            border-color: var(--success);
+            background: rgba(52, 199, 89, 0.04);
+        }
+        
+        .upload-icon {
+            font-size: 56px;
+            margin-bottom: 16px;
+        }
+        
+        .upload-text {
+            font-size: 21px;
+            font-weight: 600;
+            margin-bottom: 8px;
+            letter-spacing: -0.021em;
+        }
+        
+        .upload-hint {
+            font-size: 15px;
+            color: var(--text-secondary);
+        }
+        
+        #fileInput {
+            display: none;
+        }
+        
+        /* File Info */
+        .file-info {
+            margin-top: 24px;
+            padding: 24px;
+            background: rgba(0, 0, 0, 0.02);
+            border-radius: 16px;
+        }
+        
+        .file-info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 12px 0;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+        }
+        
+        .file-info-row:last-child {
+            border-bottom: none;
+        }
+        
+        .file-info-label {
+            font-size: 15px;
+            color: var(--text-secondary);
+        }
+        
+        .file-info-value {
+            font-size: 15px;
+            font-weight: 500;
+            font-family: "SF Mono", monospace;
+        }
+        
+        .fingerprint {
+            margin-top: 20px;
+            padding: 20px;
+            background: linear-gradient(135deg, rgba(0, 113, 227, 0.08), rgba(90, 200, 250, 0.08));
+            border-radius: 16px;
+            text-align: center;
+        }
+        
+        .fingerprint-label {
+            font-size: 13px;
+            color: var(--text-secondary);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 8px;
+        }
+        
+        .fingerprint-value {
+            font-family: "SF Mono", monospace;
+            font-size: 28px;
+            font-weight: 700;
+            color: var(--accent);
+            letter-spacing: 4px;
+        }
+        
+        /* Slider */
+        .slider-container {
+            margin-bottom: 28px;
+        }
+        
+        .slider-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .slider-label {
+            font-size: 15px;
+            font-weight: 500;
+        }
+        
+        .slider-value {
+            font-size: 15px;
+            color: var(--accent);
+            font-weight: 600;
+            font-family: "SF Mono", monospace;
+        }
+        
+        input[type="range"] {
+            width: 100%;
+            height: 6px;
+            border-radius: 3px;
+            background: rgba(0, 0, 0, 0.08);
+            outline: none;
+            -webkit-appearance: none;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: white;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        
+        input[type="range"]::-webkit-slider-thumb:hover {
+            transform: scale(1.1);
+        }
+        
+        .slider-marks {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+        }
+        
+        /* Progress */
+        .progress-section {
+            margin-top: 24px;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.02);
+            border-radius: 16px;
+        }
+        
+        .progress-header {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 12px;
+        }
+        
+        .progress-label {
+            font-size: 15px;
+            color: var(--text-secondary);
+        }
+        
+        .progress-value {
+            font-size: 15px;
+            font-weight: 600;
+            color: var(--accent);
+        }
+        
+        .progress-bar {
+            height: 8px;
+            background: rgba(0, 0, 0, 0.06);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), #5ac8fa);
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 16px;
+            justify-content: center;
+        }
+        
+        .btn {
+            padding: 16px 32px;
+            border-radius: 980px;
+            font-size: 17px;
+            font-weight: 400;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            letter-spacing: -0.022em;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .btn-primary {
+            background: var(--accent);
+            color: white;
+        }
+        
+        .btn-primary:hover:not(:disabled) {
+            background: var(--accent-hover);
+            transform: scale(1.02);
+        }
+        
+        .btn-primary:disabled {
+            background: rgba(0, 0, 0, 0.16);
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: rgba(0, 0, 0, 0.06);
+            color: var(--text-primary);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
+        /* Status */
+        .status {
+            padding: 16px 24px;
+            border-radius: 12px;
+            margin-top: 24px;
+            font-size: 15px;
+            text-align: center;
+            display: none;
+        }
+        
+        .status.show {
+            display: block;
+        }
+        
+        .status.info {
+            background: rgba(0, 113, 227, 0.08);
+            color: var(--accent);
+        }
+        
+        .status.success {
+            background: rgba(52, 199, 89, 0.08);
+            color: var(--success);
+        }
+        
+        .status.error {
+            background: rgba(255, 59, 48, 0.08);
+            color: #ff3b30;
+        }
+        
+        /* QR Section */
+        .qr-section {
+            display: none;
+        }
+        
+        .qr-section.show {
+            display: block;
+        }
+        
+        .qr-controls {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin-bottom: 32px;
+            flex-wrap: wrap;
+        }
+        
+        .qr-nav-btn {
+            padding: 12px 24px;
+            background: rgba(0, 0, 0, 0.06);
+            border: none;
+            border-radius: 980px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        
+        .qr-nav-btn:hover:not(:disabled) {
+            background: rgba(0, 0, 0, 0.1);
+        }
+        
+        .qr-nav-btn:disabled {
+            opacity: 0.4;
+            cursor: not-allowed;
+        }
+        
+        .qr-display {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 24px;
+        }
+        
+        .qr-container {
+            padding: 32px;
+            background: white;
+            border-radius: 24px;
+            box-shadow: var(--shadow);
+        }
+        
+        .qr-container.data-qr {
+            border: 3px solid var(--accent);
+        }
+        
+        .qr-container.filename-qr {
+            border: 3px solid var(--warning);
+        }
+        
+        .qr-info {
+            text-align: center;
+        }
+        
+        .qr-counter {
+            font-size: 28px;
+            font-weight: 700;
+            margin-bottom: 8px;
+            letter-spacing: -0.021em;
+        }
+        
+        .qr-type {
+            display: inline-block;
+            padding: 6px 16px;
+            border-radius: 980px;
+            font-size: 13px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+        
+        .qr-type.data {
+            background: rgba(0, 113, 227, 0.1);
+            color: var(--accent);
+        }
+        
+        .qr-type.filename {
+            background: rgba(255, 149, 0, 0.1);
+            color: var(--warning);
+        }
+        
+        .qr-hint {
+            margin-top: 12px;
+            font-size: 15px;
+            color: var(--text-secondary);
+        }
+        
+        /* Chunks Grid */
+        .chunks-grid {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            justify-content: center;
+            margin-top: 32px;
+        }
+        
+        .chunk-dot {
+            width: 40px;
+            height: 40px;
+            border-radius: 10px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            font-family: "SF Mono", monospace;
+        }
+        
+        .chunk-dot.pending {
+            background: rgba(0, 0, 0, 0.06);
+            color: var(--text-secondary);
+        }
+        
+        .chunk-dot.generated {
+            background: var(--accent);
+            color: white;
+        }
+        
+        .chunk-dot.filename {
+            background: var(--warning);
+            color: white;
+        }
+        
+        /* Toggle */
+        .toggle-section {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.02);
+            border-radius: 16px;
+        }
+        
+        .toggle-label {
+            font-size: 15px;
+            color: var(--text-secondary);
+        }
+        
+        .toggle {
+            position: relative;
+            width: 52px;
+            height: 32px;
+        }
+        
+        .toggle input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .toggle-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.16);
+            transition: 0.3s;
+            border-radius: 32px;
+        }
+        
+        .toggle-slider:before {
+            position: absolute;
+            content: "";
+            height: 28px;
+            width: 28px;
+            left: 2px;
+            bottom: 2px;
+            background: white;
+            transition: 0.3s;
+            border-radius: 50%;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .toggle input:checked + .toggle-slider {
+            background: var(--accent);
+        }
+        
+        .toggle input:checked + .toggle-slider:before {
+            transform: translateX(20px);
+        }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 40px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(0, 0, 0, 0.8);
+            backdrop-filter: blur(20px);
+            color: white;
+            padding: 16px 32px;
+            border-radius: 980px;
+            font-size: 15px;
+            opacity: 0;
+            transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+            z-index: 10000;
+        }
+        
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        
+        /* Loading */
+        .loading {
+            display: inline-block;
+            width: 18px;
+            height: 18px;
+            border: 2px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* Responsive */
+        @media (max-width: 734px) {
+            .page-header h1 {
+                font-size: 32px;
+            }
+            
+            .card {
+                padding: 24px;
+            }
+            
+            .btn-group {
+                flex-direction: column;
+            }
+            
+            .btn {
+                width: 100%;
+                justify-content: center;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="nav-content">
+            <a href="../index.html" class="logo">QRSync_Offline</a>
+            <div class="nav-links">
+                <a href="../receiver/index.html">接收端</a>
+            </div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <div class="page-header">
+            <h1>发送文件</h1>
+            <p>选择文件，生成二维码序列</p>
+        </div>
+        
+        <!-- File Selection -->
+        <div class="card">
+            <div class="card-title">
+                <div class="icon">📁</div>
+                选择文件
+            </div>
+            <div class="upload-area" id="uploadArea">
+                <div class="upload-icon">📂</div>
+                <div class="upload-text">点击或拖拽文件到此处</div>
+                <div class="upload-hint">支持任意类型文件</div>
+            </div>
+            <input type="file" id="fileInput">
+            
+            <div class="file-info" id="fileInfo" style="display: none;">
+                <div class="file-info-row">
+                    <span class="file-info-label">文件名</span>
+                    <span class="file-info-value" id="fileName">-</span>
+                </div>
+                <div class="file-info-row">
+                    <span class="file-info-label">文件大小</span>
+                    <span class="file-info-value" id="fileSize">-</span>
+                </div>
+                <div class="file-info-row">
+                    <span class="file-info-label">文件类型</span>
+                    <span class="file-info-value" id="fileType">-</span>
+                </div>
+                <div class="fingerprint">
+                    <div class="fingerprint-label">文件指纹</div>
+                    <div class="fingerprint-value" id="fileFingerprint">-</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Settings -->
+        <div class="card">
+            <div class="card-title">
+                <div class="icon">⚙️</div>
+                传输设置
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-header">
+                    <span class="slider-label">分片大小</span>
+                    <span class="slider-value" id="chunkSizeValue">800 B</span>
+                </div>
+                <input type="range" id="chunkSizeSlider" min="400" max="1500" value="800" step="50">
+                <div class="slider-marks">
+                    <span>400B</span>
+                    <span>800B</span>
+                    <span>1500B</span>
+                </div>
+            </div>
+            
+            <div class="slider-container">
+                <div class="slider-header">
+                    <span class="slider-label">二维码尺寸</span>
+                    <span class="slider-value" id="qrSizeValue">400 px</span>
+                </div>
+                <input type="range" id="qrSizeSlider" min="256" max="600" value="400" step="32">
+                <div class="slider-marks">
+                    <span>256px</span>
+                    <span>400px</span>
+                    <span>600px</span>
+                </div>
+            </div>
+            
+            <div class="progress-section">
+                <div class="progress-header">
+                    <span class="progress-label">预估二维码数量</span>
+                    <span class="progress-value" id="estimatedChunks">-- 个</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="estimationBar" style="width: 0%"></div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Controls -->
+        <div class="card">
+            <div class="card-title">
+                <div class="icon">🚀</div>
+                开始传输
+            </div>
+            
+            <div class="btn-group">
+                <button class="btn btn-primary" id="generateBtn" disabled>
+                    <span>生成二维码</span>
+                </button>
+                <button class="btn btn-secondary" id="resetBtn">
+                    <span>重置</span>
+                </button>
+            </div>
+            
+            <div class="status info" id="status">请选择一个文件开始</div>
+        </div>
+        
+        <!-- QR Display -->
+        <div class="card qr-section" id="qrSection">
+            <div class="card-title">
+                <div class="icon">📱</div>
+                二维码序列
+            </div>
+            
+            <div class="toggle-section">
+                <span class="toggle-label">自动轮播</span>
+                <label class="toggle">
+                    <input type="checkbox" id="autoplayToggle">
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label" id="autoplayStatus">关闭</span>
+            </div>
+            
+            <div class="qr-controls">
+                <button class="qr-nav-btn" id="prevBtn">← 上一个</button>
+                <button class="qr-nav-btn" id="playBtn">▶ 播放</button>
+                <button class="qr-nav-btn" id="nextBtn">下一个 →</button>
+            </div>
+            
+            <div class="qr-display">
+                <div class="qr-container data-qr" id="qrContainer">
+                    <div id="qrcode"></div>
+                </div>
+                <div class="qr-info">
+                    <div class="qr-counter" id="qrCounter">1 / 10</div>
+                    <span class="qr-type data" id="qrType">数据分片</span>
+                    <div class="qr-hint" id="qrHint">请使用手机接收端扫描此二维码</div>
+                </div>
+            </div>
+            
+            <div class="chunks-grid" id="chunksGrid"></div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ==================== 配置和常量 ====================
+        const CONFIG = {
+            CHUNK_SIZE: 800,
+            QR_SIZE: 400,
+            MAX_JSON_SIZE: 1800,
+            QR_MAX_CAPACITY: 2953,
+            AUTOPLAY_INTERVAL: 2000,
+            PACKET_TYPES: {
+                DATA: 'data',
+                FILENAME: 'fn'
+            }
+        };
+
+        // ==================== 状态变量 ====================
+        let file = null;
+        let chunks = [];
+        let currentChunkIndex = 0;
+        let fileFingerprint = '';
+        let originalFileName = '';
+        let originalFileSize = 0;
+        let qrCodes = [];
+        let fileNameQrCode = null;
+        let autoplayInterval = null;
+        let isPlaying = false;
+
+        // ==================== DOM 元素 ====================
+        const uploadArea = document.getElementById('uploadArea');
+        const fileInput = document.getElementById('fileInput');
+        const fileInfo = document.getElementById('fileInfo');
+        const generateBtn = document.getElementById('generateBtn');
+        const resetBtn = document.getElementById('resetBtn');
+        const status = document.getElementById('status');
+        const qrSection = document.getElementById('qrSection');
+        const qrContainer = document.getElementById('qrContainer');
+        const chunksGrid = document.getElementById('chunksGrid');
+        const toast = document.getElementById('toast');
+
+        // ==================== 工具函数 ====================
+        function generateShortFileId() {
+            const timestamp = Date.now();
+            const random = Math.floor(Math.random() * 46656);
+            const combined = (timestamp % 60466176) * 1000 + random;
+            return combined.toString(36).padStart(5, '0').slice(-5).toUpperCase();
+        }
+
+        function calculateCRC32(data) {
+            if (typeof pako !== 'undefined' && pako.crc32) {
+                return pako.crc32(data).toString(36).padStart(5, '0').slice(-5);
+            }
+            
+            const table = new Uint32Array(256);
+            for (let i = 0; i < 256; i++) {
+                let c = i;
+                for (let j = 0; j < 8; j++) {
+                    c = (c & 1) ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+                }
+                table[i] = c;
+            }
+            
+            let crc = 0xFFFFFFFF;
+            for (let i = 0; i < data.length; i++) {
+                crc = (crc >>> 8) ^ table[(crc ^ data.charCodeAt(i)) & 0xFF];
+            }
+            crc = (crc ^ 0xFFFFFFFF) >>> 0;
+            return crc.toString(36).padStart(5, '0').slice(-5);
+        }
+
+        function encodeFileName(filename) {
+            try {
+                const encoder = new TextEncoder();
+                const encoded = encoder.encode(filename);
+                return btoa(String.fromCharCode(...encoded));
+            } catch (e) {
+                return btoa(unescape(encodeURIComponent(filename)));
+            }
+        }
+
+        function uint8ArrayToBase64(uint8Array) {
+            const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+            let result = '';
+            for (let i = 0; i < uint8Array.length; i += 3) {
+                const byte1 = uint8Array[i];
+                const byte2 = i + 1 < uint8Array.length ? uint8Array[i + 1] : 0;
+                const byte3 = i + 2 < uint8Array.length ? uint8Array[i + 2] : 0;
+                const triplet = (byte1 << 16) | (byte2 << 8) | byte3;
+                result += base64Chars.charAt((triplet >> 18) & 63);
+                result += base64Chars.charAt((triplet >> 12) & 63);
+                result += (i + 1 < uint8Array.length) ? base64Chars.charAt((triplet >> 6) & 63) : '=';
+                result += (i + 2 < uint8Array.length) ? base64Chars.charAt(triplet & 63) : '=';
+            }
+            return result;
+        }
+
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+        }
+
+        function readFileAsArrayBuffer(file) {
+            return new Promise((resolve, reject) => {
+                const reader = new FileReader();
+                reader.onload = () => resolve(reader.result);
+                reader.onerror = reject;
+                reader.readAsArrayBuffer(file);
+            });
+        }
+
+        function showToast(message) {
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function showStatus(message, type = 'info') {
+            status.textContent = message;
+            status.className = 'status show ' + type;
+        }
+
+        // ==================== 事件处理 ====================
+        uploadArea.addEventListener('click', () => fileInput.click());
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+        
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+        
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(selectedFile) {
+            file = selectedFile;
+            originalFileName = file.name;
+            originalFileSize = file.size;
+            
+            document.getElementById('fileName').textContent = originalFileName;
+            document.getElementById('fileSize').textContent = formatFileSize(originalFileSize);
+            document.getElementById('fileType').textContent = file.type || '未知类型';
+            
+            fileFingerprint = generateShortFileId();
+            document.getElementById('fileFingerprint').textContent = fileFingerprint;
+            
+            uploadArea.classList.add('has-file');
+            uploadArea.innerHTML = `
+                <div class="upload-icon">✅</div>
+                <div class="upload-text">文件已选择</div>
+                <div class="upload-hint">${originalFileName}</div>
+            `;
+            
+            fileInfo.style.display = 'block';
+            generateBtn.disabled = false;
+            
+            updateChunkEstimation();
+            showStatus('文件已选择，点击"生成二维码"开始', 'success');
+            showToast('文件选择成功');
+        }
+
+        // 滑块事件
+        const chunkSizeSlider = document.getElementById('chunkSizeSlider');
+        const chunkSizeValue = document.getElementById('chunkSizeValue');
+        
+        chunkSizeSlider.addEventListener('input', function() {
+            CONFIG.CHUNK_SIZE = parseInt(this.value);
+            chunkSizeValue.textContent = CONFIG.CHUNK_SIZE + ' B';
+            updateChunkEstimation();
+        });
+
+        const qrSizeSlider = document.getElementById('qrSizeSlider');
+        const qrSizeValue = document.getElementById('qrSizeValue');
+        
+        qrSizeSlider.addEventListener('input', function() {
+            CONFIG.QR_SIZE = parseInt(this.value);
+            qrSizeValue.textContent = CONFIG.QR_SIZE + ' px';
+        });
+
+        function updateChunkEstimation() {
+            if (!file) return;
+            const estimatedCompressedSize = file.size * 0.6;
+            const estimated = Math.ceil(estimatedCompressedSize / CONFIG.CHUNK_SIZE);
+            document.getElementById('estimatedChunks').textContent = (estimated + 1) + ' 个';
+            document.getElementById('estimationBar').style.width = Math.min(estimated / 50 * 100, 100) + '%';
+        }
+
+        // 生成二维码
+        generateBtn.addEventListener('click', async () => {
+            if (!file) {
+                showStatus('请先选择文件', 'error');
+                return;
+            }
+
+            if (typeof QRCode === 'undefined') {
+                showStatus('QRCode库未加载', 'error');
+                return;
+            }
+
+            try {
+                generateBtn.disabled = true;
+                generateBtn.innerHTML = '<span class="loading"></span> 处理中...';
+                showStatus('正在读取并压缩文件...', 'info');
+
+                const fileBuffer = await readFileAsArrayBuffer(file);
+                const compressed = pako.deflate(new Uint8Array(fileBuffer));
+                
+                showStatus(`压缩完成: ${formatFileSize(fileBuffer.byteLength)} → ${formatFileSize(compressed.length)}`, 'success');
+                
+                await processFileChunks(compressed);
+                
+            } catch (error) {
+                console.error('处理文件时出错:', error);
+                showStatus('处理文件时出错: ' + error.message, 'error');
+                generateBtn.disabled = false;
+                generateBtn.innerHTML = '<span>生成二维码</span>';
+            }
+        });
+
+        async function processFileChunks(compressed) {
+            chunks = [];
+            qrCodes = [];
+            
+            const totalChunks = Math.ceil(compressed.length / CONFIG.CHUNK_SIZE);
+            
+            if (totalChunks <= 0) {
+                throw new Error('分片计算错误');
+            }
+
+            showStatus(`正在分片处理... (共 ${totalChunks} 个数据分片)`, 'info');
+
+            const compressedArray = new Uint8Array(compressed);
+            
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * CONFIG.CHUNK_SIZE;
+                const end = Math.min(start + CONFIG.CHUNK_SIZE, compressed.length);
+                const chunkData = compressedArray.slice(start, end);
+                const base64Data = uint8ArrayToBase64(chunkData);
+                const crc32Hash = calculateCRC32(base64Data);
+                
+                const chunkObj = {
+                    i: i,
+                    t: totalChunks,
+                    h: crc32Hash,
+                    f: fileFingerprint,
+                    d: base64Data
+                };
+                
+                const jsonStr = JSON.stringify(chunkObj);
+                
+                if (jsonStr.length > CONFIG.QR_MAX_CAPACITY) {
+                    const excessRatio = jsonStr.length / CONFIG.QR_MAX_CAPACITY;
+                    const newChunkSize = Math.floor(CONFIG.CHUNK_SIZE / excessRatio * 0.8);
+                    
+                    showStatus(`分片 ${i+1} 数据过大，请减小分片大小`, 'error');
+                    chunkSizeSlider.value = Math.max(400, newChunkSize);
+                    chunkSizeValue.textContent = Math.max(400, newChunkSize) + ' B';
+                    CONFIG.CHUNK_SIZE = Math.max(400, newChunkSize);
+                    
+                    generateBtn.disabled = false;
+                    generateBtn.innerHTML = '<span>生成二维码</span>';
+                    return;
+                }
+                
+                chunks.push(chunkObj);
+                
+                if (i % Math.max(1, Math.floor(totalChunks / 10)) === 0) {
+                    showStatus(`分片进度: ${i+1}/${totalChunks}`, 'info');
+                }
+            }
+            
+            createFileNameQrCode(totalChunks);
+            
+            showStatus(`处理完成！共 ${totalChunks} 个数据分片 + 1 个文件名分片`, 'success');
+            
+            await generateQRCodeSequence();
+        }
+
+        function createFileNameQrCode(totalChunks) {
+            const encodedFileName = encodeFileName(originalFileName);
+            const fileNameData = {
+                t: CONFIG.PACKET_TYPES.FILENAME,
+                f: fileFingerprint,
+                n: encodedFileName,
+                s: originalFileSize,
+                ts: Date.now(),
+                tc: totalChunks
+            };
+            
+            const crcData = {
+                t: fileNameData.t,
+                f: fileNameData.f,
+                n: fileNameData.n,
+                s: fileNameData.s,
+                ts: fileNameData.ts,
+                tc: fileNameData.tc
+            };
+            
+            fileNameData.h = calculateCRC32(JSON.stringify(crcData));
+            fileNameQrCode = fileNameData;
+        }
+
+        async function generateQRCodeSequence() {
+            qrSection.classList.add('show');
+            currentChunkIndex = 0;
+            
+            const totalQRCodes = chunks.length + 1;
+            
+            qrCodes = [];
+            
+            for (let i = 0; i < chunks.length; i++) {
+                qrCodes.push({
+                    data: chunks[i],
+                    type: CONFIG.PACKET_TYPES.DATA,
+                    index: i
+                });
+            }
+            
+            qrCodes.push({
+                data: fileNameQrCode,
+                type: CONFIG.PACKET_TYPES.FILENAME,
+                index: chunks.length
+            });
+            
+            renderChunksGrid();
+            showQRCode(0);
+            
+            generateBtn.disabled = false;
+            generateBtn.innerHTML = '<span>生成二维码</span>';
+            
+            showToast('二维码生成完成');
+            
+            qrSection.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function renderChunksGrid() {
+            chunksGrid.innerHTML = '';
+            
+            for (let i = 0; i < chunks.length; i++) {
+                const dot = document.createElement('div');
+                dot.className = 'chunk-dot pending';
+                dot.textContent = i + 1;
+                dot.id = `chunk-dot-${i}`;
+                dot.onclick = () => {
+                    stopAutoplay();
+                    showQRCode(i);
+                };
+                chunksGrid.appendChild(dot);
+            }
+            
+            const filenameDot = document.createElement('div');
+            filenameDot.className = 'chunk-dot filename';
+            filenameDot.textContent = '📄';
+            filenameDot.id = 'chunk-dot-filename';
+            filenameDot.onclick = () => {
+                stopAutoplay();
+                showQRCode(chunks.length);
+            };
+            chunksGrid.appendChild(filenameDot);
+        }
+
+        function showQRCode(index) {
+            currentChunkIndex = index;
+            const qrData = qrCodes[index];
+            
+            qrContainer.innerHTML = '<div id="qrcode"></div>';
+            
+            const isFilenameQR = qrData.type === CONFIG.PACKET_TYPES.FILENAME;
+            
+            qrContainer.className = isFilenameQR ? 'qr-container filename-qr' : 'qr-container data-qr';
+            
+            new QRCode(document.getElementById('qrcode'), {
+                text: JSON.stringify(qrData.data),
+                width: CONFIG.QR_SIZE,
+                height: CONFIG.QR_SIZE,
+                colorDark: isFilenameQR ? '#ff9500' : '#0071e3',
+                colorLight: '#ffffff',
+                correctLevel: QRCode.CorrectLevel.L
+            });
+            
+            document.getElementById('qrCounter').textContent = `${index + 1} / ${qrCodes.length}`;
+            
+            const qrType = document.getElementById('qrType');
+            qrType.textContent = isFilenameQR ? '文件名分片' : `数据分片 ${qrData.data.i + 1}/${qrData.data.t}`;
+            qrType.className = 'qr-type ' + (isFilenameQR ? 'filename' : 'data');
+            
+            document.getElementById('qrHint').textContent = isFilenameQR 
+                ? '⚠️ 请最后扫描此二维码' 
+                : '请使用手机接收端扫描此二维码';
+            
+            document.querySelectorAll('.chunk-dot').forEach((dot, i) => {
+                if (i === index) {
+                    dot.classList.add('generated');
+                    dot.classList.remove('pending');
+                }
+            });
+        }
+
+        // 二维码导航
+        document.getElementById('prevBtn').addEventListener('click', () => {
+            stopAutoplay();
+            if (currentChunkIndex > 0) {
+                showQRCode(currentChunkIndex - 1);
+            }
+        });
+
+        document.getElementById('nextBtn').addEventListener('click', () => {
+            stopAutoplay();
+            if (currentChunkIndex < qrCodes.length - 1) {
+                showQRCode(currentChunkIndex + 1);
+            }
+        });
+
+        // 自动播放
+        const playBtn = document.getElementById('playBtn');
+        const autoplayToggle = document.getElementById('autoplayToggle');
+        const autoplayStatus = document.getElementById('autoplayStatus');
+
+        playBtn.addEventListener('click', () => {
+            if (isPlaying) {
+                stopAutoplay();
+            } else {
+                startAutoplay();
+            }
+        });
+
+        autoplayToggle.addEventListener('change', () => {
+            if (autoplayToggle.checked) {
+                startAutoplay();
+            } else {
+                stopAutoplay();
+            }
+        });
+
+        function startAutoplay() {
+            isPlaying = true;
+            playBtn.textContent = '⏸ 暂停';
+            autoplayToggle.checked = true;
+            autoplayStatus.textContent = '开启';
+            
+            autoplayInterval = setInterval(() => {
+                if (currentChunkIndex < qrCodes.length - 1) {
+                    showQRCode(currentChunkIndex + 1);
+                } else {
+                    showQRCode(0);
+                }
+            }, CONFIG.AUTOPLAY_INTERVAL);
+        }
+
+        function stopAutoplay() {
+            isPlaying = false;
+            playBtn.textContent = '▶ 播放';
+            autoplayToggle.checked = false;
+            autoplayStatus.textContent = '关闭';
+            
+            if (autoplayInterval) {
+                clearInterval(autoplayInterval);
+                autoplayInterval = null;
+            }
+        }
+
+        // 重置
+        resetBtn.addEventListener('click', () => {
+            stopAutoplay();
+            
+            file = null;
+            chunks = [];
+            qrCodes = [];
+            currentChunkIndex = 0;
+            fileFingerprint = '';
+            originalFileName = '';
+            originalFileSize = 0;
+            fileNameQrCode = null;
+            
+            fileInput.value = '';
+            uploadArea.classList.remove('has-file');
+            uploadArea.innerHTML = `
+                <div class="upload-icon">📂</div>
+                <div class="upload-text">点击或拖拽文件到此处</div>
+                <div class="upload-hint">支持任意类型文件</div>
+            `;
+            
+            fileInfo.style.display = 'none';
+            qrSection.classList.remove('show');
+            generateBtn.disabled = true;
+            
+            chunkSizeSlider.value = 800;
+            chunkSizeValue.textContent = '800 B';
+            CONFIG.CHUNK_SIZE = 800;
+            
+            qrSizeSlider.value = 400;
+            qrSizeValue.textContent = '400 px';
+            CONFIG.QR_SIZE = 400;
+            
+            document.getElementById('estimatedChunks').textContent = '-- 个';
+            document.getElementById('estimationBar').style.width = '0%';
+            
+            showStatus('请选择一个文件开始', 'info');
+            showToast('已重置');
+        });
+
+        // 页面加载
+        window.addEventListener('load', () => {
+            console.log('QRSync_Offline 发送端已加载');
+            
+            if (typeof QRCode === 'undefined') {
+                showStatus('QRCode库未加载', 'error');
+            }
+            
+            if (typeof pako === 'undefined') {
+                showStatus('压缩库未加载', 'error');
+            }
+        });
+    </script>
+</body>
+</html>

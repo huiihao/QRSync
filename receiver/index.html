@@ -1,0 +1,1213 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <title>QRSync_Offline - 接收端</title>
+    <script src="https://cdn.jsdelivr.net/npm/@zxing/library@0.20.0/umd/index.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pako@2.1.0/dist/pako.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+        
+        :root {
+            --bg: #f5f5f7;
+            --card-bg: rgba(255, 255, 255, 0.72);
+            --card-border: rgba(255, 255, 255, 0.5);
+            --text-primary: #1d1d1f;
+            --text-secondary: #86868b;
+            --accent: #0071e3;
+            --accent-hover: #0077ed;
+            --success: #34c759;
+            --warning: #ff9500;
+            --error: #ff3b30;
+            --shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            min-height: 100vh;
+            color: var(--text-primary);
+            line-height: 1.47059;
+            -webkit-font-smoothing: antialiased;
+        }
+        
+        nav {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 52px;
+            background: rgba(255, 255, 255, 0.72);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+            z-index: 1000;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .nav-content {
+            width: 100%;
+            max-width: 1024px;
+            padding: 0 22px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        
+        .logo {
+            font-size: 21px;
+            font-weight: 600;
+            text-decoration: none;
+            color: var(--text-primary);
+        }
+        
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 100px 20px 40px;
+        }
+        
+        h1 {
+            font-size: 48px;
+            font-weight: 700;
+            text-align: center;
+            margin-bottom: 40px;
+            letter-spacing: -0.003em;
+        }
+        
+        @media (max-width: 734px) {
+            h1 { font-size: 32px; }
+            .container { padding-top: 80px; }
+        }
+        
+        .mode-switcher {
+            display: flex;
+            background: rgba(0, 0, 0, 0.04);
+            border-radius: 12px;
+            padding: 4px;
+            margin-bottom: 30px;
+            width: fit-content;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .mode-btn {
+            padding: 12px 24px;
+            border: none;
+            background: transparent;
+            color: var(--text-secondary);
+            font-size: 15px;
+            font-weight: 500;
+            cursor: pointer;
+            border-radius: 8px;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .mode-btn.active {
+            background: white;
+            color: var(--accent);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+        }
+        
+        @media (max-width: 734px) {
+            .mode-btn { padding: 10px 16px; font-size: 14px; }
+        }
+        
+        .scanner-container {
+            background: var(--card-bg);
+            backdrop-filter: saturate(180%) blur(20px);
+            -webkit-backdrop-filter: saturate(180%) blur(20px);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 40px;
+            box-shadow: var(--shadow);
+        }
+        
+        @media (max-width: 734px) {
+            .scanner-container { padding: 24px; border-radius: 20px; }
+        }
+        
+        #camera-section, #virtual-section {
+            display: none;
+        }
+        
+        #camera-section.active, #virtual-section.active {
+            display: block;
+        }
+        
+        /* Mobile Camera - Fixed Layout like reference */
+        .camera-section-mobile {
+            position: relative;
+            margin-bottom: 20px;
+        }
+        
+        .camera-select-row {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        
+        .camera-select-row select {
+            flex: 1;
+            min-width: 200px;
+            padding: 12px;
+            border: 1px solid rgba(0, 0, 0, 0.1);
+            border-radius: 10px;
+            font-size: 15px;
+            background: white;
+            appearance: none;
+            -webkit-appearance: none;
+            background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%2386868b' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+            background-repeat: no-repeat;
+            background-position: right 12px center;
+            padding-right: 36px;
+        }
+        
+        /* Scan Window - Mobile Optimized like reference */
+        .scan-window {
+            width: 100%;
+            background: #000;
+            position: relative;
+            padding-top: 100%; /* 1:1 Aspect Ratio */
+            border-radius: 16px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        
+        .video-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+        }
+        
+        #video {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .scan-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 2;
+        }
+        
+        .scan-frame {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 70%;
+            height: 70%;
+            border: 3px solid var(--accent);
+            border-radius: 20px;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
+        }
+        
+        .corner {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-color: var(--accent);
+            border-style: solid;
+        }
+        
+        .corner.tl { top: -3px; left: -3px; border-width: 4px 0 0 4px; }
+        .corner.tr { top: -3px; right: -3px; border-width: 4px 4px 0 0; }
+        .corner.bl { bottom: -3px; left: -3px; border-width: 0 0 4px 4px; }
+        .corner.br { bottom: -3px; right: -3px; border-width: 0 4px 4px 0; }
+        
+        .scan-tips {
+            background: rgba(0, 113, 227, 0.9);
+            color: white;
+            text-align: center;
+            padding: 12px;
+            border-radius: 12px;
+            font-size: 14px;
+            margin-top: -10px;
+            margin-bottom: 20px;
+        }
+        
+        /* Error Panel */
+        .error-panel {
+            background: rgba(255, 59, 48, 0.1);
+            border: 1px solid rgba(255, 59, 48, 0.2);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            display: none;
+        }
+        
+        .error-panel.active { display: block; }
+        
+        .error-title {
+            font-weight: 600;
+            color: var(--error);
+            margin-bottom: 8px;
+            font-size: 15px;
+        }
+        
+        /* Virtual Camera - Fixed Image Display */
+        .upload-zone {
+            border: 2px dashed rgba(0, 113, 227, 0.3);
+            border-radius: 16px;
+            padding: 40px;
+            text-align: center;
+            background: rgba(0, 113, 227, 0.02);
+            transition: all 0.3s;
+            cursor: pointer;
+            margin-bottom: 20px;
+        }
+        
+        .upload-zone:hover, .upload-zone.dragover {
+            border-color: var(--accent);
+            background: rgba(0, 113, 227, 0.05);
+        }
+        
+        .upload-zone h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        
+        .upload-zone p {
+            font-size: 15px;
+            color: var(--text-secondary);
+            margin-bottom: 12px;
+        }
+        
+        .paste-tip {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 16px;
+            background: white;
+            border-radius: 8px;
+            font-size: 13px;
+            color: var(--text-secondary);
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+        }
+        
+        kbd {
+            padding: 2px 6px;
+            background: rgba(0,0,0,0.05);
+            border-radius: 4px;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        
+        /* Image Preview - Fixed to match image aspect ratio */
+        .preview-section {
+            display: none;
+            margin-bottom: 24px;
+        }
+        
+        .preview-section.active {
+            display: block;
+        }
+        
+        .image-preview-container {
+            width: 100%;
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            position: relative;
+            margin-bottom: 20px;
+            /* Dynamic aspect ratio set by JS */
+        }
+        
+        #preview-canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+        
+        /* Scan overlay for images - matches actual image dimensions */
+        .image-scan-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .image-scan-frame {
+            width: 70%;
+            height: 70%;
+            border: 3px solid var(--accent);
+            border-radius: 20px;
+            position: relative;
+            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
+        }
+        
+        /* Queue */
+        .queue-section {
+            margin-bottom: 24px;
+        }
+        
+        .queue-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+        
+        .queue-list {
+            display: flex;
+            gap: 12px;
+            overflow-x: auto;
+            padding: 4px;
+            margin-bottom: 16px;
+            -webkit-overflow-scrolling: touch;
+        }
+        
+        .queue-item {
+            flex-shrink: 0;
+            width: 80px;
+            height: 80px;
+            border-radius: 12px;
+            overflow: hidden;
+            position: relative;
+            border: 3px solid transparent;
+            background: rgba(0,0,0,0.05);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .queue-item img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+        
+        .queue-item.pending { border-color: var(--accent); }
+        .queue-item.completed { border-color: var(--success); opacity: 0.7; }
+        .queue-item.error { border-color: var(--error); }
+        .queue-item.active { box-shadow: 0 0 0 3px rgba(0,113,227,0.3); }
+        
+        .queue-badge {
+            position: absolute;
+            top: 4px;
+            right: 4px;
+            background: var(--accent);
+            color: white;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .queue-item.completed .queue-badge { background: var(--success); }
+        
+        /* Buttons */
+        .btn {
+            padding: 14px 28px;
+            border-radius: 980px;
+            font-size: 17px;
+            font-weight: 400;
+            border: none;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            touch-action: manipulation;
+            -webkit-touch-callout: none;
+            background: var(--accent);
+            color: white;
+            width: 100%;
+        }
+        
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-secondary { background: rgba(0,0,0,0.08); color: var(--text-primary); }
+        .btn-success { background: var(--success); }
+        
+        @media (max-width: 734px) {
+            .btn { padding: 16px; font-size: 16px; }
+        }
+        
+        .action-buttons {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        
+        .action-buttons .btn {
+            flex: 1;
+            min-width: 140px;
+        }
+        
+        /* Status Bar */
+        .status-bar {
+            background: rgba(0,0,0,0.04);
+            border-radius: 12px;
+            padding: 20px;
+            margin-top: 30px;
+        }
+        
+        .status-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 8px;
+            background: rgba(0,0,0,0.08);
+            border-radius: 4px;
+            overflow: hidden;
+            margin-bottom: 12px;
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: var(--accent);
+            border-radius: 4px;
+            transition: width 0.3s;
+            width: 0%;
+        }
+        
+        .chunks-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
+            gap: 6px;
+            max-height: 120px;
+            overflow-y: auto;
+        }
+        
+        .chunk-cell {
+            aspect-ratio: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(0,0,0,0.06);
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: 600;
+            color: var(--text-secondary);
+        }
+        
+        .chunk-cell.filled {
+            background: var(--success);
+            color: white;
+        }
+        
+        /* Toast */
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 14px 28px;
+            border-radius: 12px;
+            font-size: 15px;
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 2000;
+            backdrop-filter: blur(10px);
+            text-align: center;
+            max-width: 90%;
+        }
+        
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+        
+        .hidden-file-input { display: none; }
+    </style>
+</head>
+<body>
+    <nav>
+        <div class="nav-content">
+            <a href="../index.html" class="logo">QRSync_Offline</a>
+            <div style="font-size: 14px; color: var(--text-secondary);">接收端</div>
+        </div>
+    </nav>
+    
+    <div class="container">
+        <h1>接收文件</h1>
+        
+        <div class="mode-switcher">
+            <button class="mode-btn active" onclick="switchMode('camera')">📷 相机扫描</button>
+            <button class="mode-btn" onclick="switchMode('virtual')">🖼️ 图片识别</button>
+        </div>
+        
+        <div class="scanner-container">
+            <!-- Camera Section - Based on reference implementation -->
+            <div id="camera-section" class="active">
+                <div class="camera-section-mobile">
+                    <div class="camera-select-row">
+                        <select id="camera-select">
+                            <option value="">请选择摄像头...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="error-panel" id="camera-error">
+                        <div class="error-title">⚠️ 相机启动失败</div>
+                        <div id="error-text" style="font-size: 14px; color: var(--text-secondary); margin-bottom: 12px;"></div>
+                        <button class="btn btn-secondary" onclick="initCamera()" style="width: auto; padding: 8px 16px; font-size: 14px;">重试</button>
+                    </div>
+                    
+                    <div class="scan-window" id="scan-window">
+                        <div class="video-container">
+                            <video id="video" playsinline></video>
+                            <div class="scan-overlay">
+                                <div class="scan-frame">
+                                    <div class="corner tl"></div>
+                                    <div class="corner tr"></div>
+                                    <div class="corner bl"></div>
+                                    <div class="corner br"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="scan-tips">
+                        请将二维码对准框内 | 自动扫描
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <button class="btn" id="btn-start" onclick="startCamera()">🚀 开始扫描</button>
+                        <button class="btn btn-secondary" id="btn-stop" onclick="stopCamera()" disabled>⏹️ 停止</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Virtual Section -->
+            <div id="virtual-section">
+                <div class="upload-zone" onclick="document.getElementById('file-input').click()" 
+                     ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
+                    <h3>📁 添加图片到队列</h3>
+                    <p>支持拖拽、粘贴或点击选择多张图片</p>
+                    <div class="paste-tip">
+                        <kbd id="kbd-cmd">Ctrl</kbd> + <kbd>V</kbd> 粘贴
+                    </div>
+                </div>
+                
+                <input type="file" id="file-input" class="hidden-file-input" accept="image/*" multiple onchange="handleFileSelect(event)">
+                
+                <!-- Queue -->
+                <div class="queue-section" id="queue-section" style="display: none;">
+                    <div class="queue-header">
+                        <span style="font-weight: 600;">处理队列</span>
+                        <span style="font-size: 14px; color: var(--text-secondary);">
+                            <span id="queue-completed">0</span>/<span id="queue-total">0</span> 完成
+                        </span>
+                    </div>
+                    <div class="queue-list" id="queue-list"></div>
+                    
+                    <div class="action-buttons" style="margin-bottom: 20px;">
+                        <button class="btn btn-secondary" onclick="clearQueue()" style="flex: 0.5;">清空</button>
+                        <button class="btn" onclick="processQueue()" id="btn-process">▶ 开始处理</button>
+                    </div>
+                </div>
+                
+                <!-- Image Preview with correct aspect ratio -->
+                <div class="preview-section" id="preview-section">
+                    <div class="image-preview-container" id="preview-container">
+                        <canvas id="preview-canvas"></canvas>
+                        <div class="image-scan-overlay">
+                            <div class="image-scan-frame">
+                                <div class="corner tl"></div>
+                                <div class="corner tr"></div>
+                                <div class="corner bl"></div>
+                                <div class="corner br"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="action-buttons">
+                        <button class="btn" onclick="scanCurrent()" id="btn-scan">🔍 识别此图</button>
+                        <button class="btn btn-secondary" onclick="nextImage()">⏭️ 下一张</button>
+                    </div>
+                    
+                    <div style="text-align: center; margin-top: 12px; font-size: 14px; color: var(--text-secondary);">
+                        <span id="current-status">等待识别</span> | 
+                        <span id="current-file">--</span>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Status -->
+            <div class="status-bar">
+                <div class="status-header">
+                    <span style="font-weight: 600;" id="status-text">准备就绪</span>
+                    <span id="progress-text">0%</span>
+                </div>
+                <div class="progress-bar">
+                    <div class="progress-fill" id="progress-fill"></div>
+                </div>
+                <div class="chunks-grid" id="chunks-grid"></div>
+            </div>
+            
+            <div class="action-buttons" style="margin-top: 24px;">
+                <button class="btn btn-secondary" onclick="loadProgress()">🔄 恢复</button>
+                <button class="btn btn-success" onclick="reassembleFile()" id="btn-reassemble" disabled>🧩 重组</button>
+                <button class="btn btn-success" onclick="downloadFile()" id="btn-download" disabled>⬇️ 下载</button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="toast" id="toast"></div>
+
+    <script>
+        // ==================== Global State ====================
+        let codeReader = null;
+        let scanControls = null;
+        let isScanning = false;
+        let currentMode = 'camera';
+        
+        let receivedChunks = new Map();
+        let fileInfo = null;
+        
+        // Image queue
+        let imageQueue = [];
+        let currentImageIndex = -1;
+        
+        // ==================== Init ====================
+        document.addEventListener('DOMContentLoaded', async () => {
+            // Detect OS
+            const isMac = navigator.platform.includes('Mac');
+            document.getElementById('kbd-cmd').textContent = isMac ? '⌘' : 'Ctrl';
+            
+            // Setup paste
+            document.addEventListener('paste', handlePaste);
+            
+            // Init camera list
+            await initCameraList();
+            
+            // Load saved
+            await loadProgress();
+        });
+        
+        // ==================== Camera Module (From Reference) ====================
+        async function initCameraList() {
+            try {
+                // Try to get permission first
+                await navigator.mediaDevices.getUserMedia({ video: true });
+                
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const cameras = devices.filter(d => d.kind === 'videoinput');
+                
+                const select = document.getElementById('camera-select');
+                select.innerHTML = '<option value="">请选择摄像头...</option>';
+                
+                cameras.forEach((cam, idx) => {
+                    const option = document.createElement('option');
+                    option.value = cam.deviceId;
+                    let label = cam.label || `摄像头 ${idx + 1}`;
+                    
+                    // Detect back camera
+                    if (label.toLowerCase().includes('back') || 
+                        label.toLowerCase().includes('rear') ||
+                        label.includes('后置')) {
+                        label += ' [后置]';
+                        option.selected = true;
+                    }
+                    
+                    option.text = label;
+                    select.appendChild(option);
+                });
+            } catch (err) {
+                console.error('Camera list error:', err);
+            }
+        }
+        
+        async function startCamera() {
+            hideError();
+            const deviceId = document.getElementById('camera-select').value;
+            
+            try {
+                document.getElementById('btn-start').disabled = true;
+                document.getElementById('btn-start').textContent = '⏳ 启动中...';
+                
+                codeReader = new ZXing.BrowserQRCodeReader({
+                    tryHarder: true,
+                    formats: [ZXing.BarcodeFormat.QR_CODE]
+                });
+                
+                scanControls = await codeReader.decodeFromVideoDevice(
+                    deviceId || undefined,
+                    document.getElementById('video'),
+                    (result, error, controls) => {
+                        if (result) {
+                            handleScanResult(result.getText());
+                        }
+                    }
+                );
+                
+                isScanning = true;
+                document.getElementById('btn-start').disabled = false;
+                document.getElementById('btn-start').textContent = '⏹️ 停止扫描';
+                document.getElementById('btn-start').onclick = stopCamera;
+                document.getElementById('btn-stop').disabled = false;
+                
+                showToast('📷 相机已启动');
+                
+            } catch (err) {
+                console.error('Start failed:', err);
+                showCameraError(err);
+                document.getElementById('btn-start').disabled = false;
+                document.getElementById('btn-start').textContent = '🚀 开始扫描';
+            }
+        }
+        
+        function stopCamera() {
+            if (scanControls) {
+                scanControls.stop();
+                scanControls = null;
+            }
+            if (codeReader) {
+                codeReader.reset();
+                codeReader = null;
+            }
+            
+            const video = document.getElementById('video');
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(t => t.stop());
+                video.srcObject = null;
+            }
+            
+            isScanning = false;
+            document.getElementById('btn-start').disabled = false;
+            document.getElementById('btn-start').textContent = '🚀 开始扫描';
+            document.getElementById('btn-start').onclick = startCamera;
+            document.getElementById('btn-stop').disabled = true;
+        }
+        
+        function showCameraError(err) {
+            const panel = document.getElementById('camera-error');
+            const text = document.getElementById('error-text');
+            
+            let msg = '无法启动相机';
+            if (err.name === 'NotAllowedError') msg = '请允许相机权限（设置 > 隐私 > 相机）';
+            else if (err.name === 'NotFoundError') msg = '未找到摄像头设备';
+            else if (err.name === 'NotReadableError') msg = '摄像头被其他应用占用';
+            else msg = err.message;
+            
+            text.textContent = msg;
+            panel.classList.add('active');
+        }
+        
+        function hideError() {
+            document.getElementById('camera-error').classList.remove('active');
+        }
+        
+        // ==================== Image Queue System ====================
+        function switchMode(mode) {
+            currentMode = mode;
+            document.querySelectorAll('.mode-btn').forEach((btn, idx) => {
+                btn.classList.toggle('active', (mode === 'camera' && idx === 0) || (mode === 'virtual' && idx === 1));
+            });
+            document.getElementById('camera-section').classList.toggle('active', mode === 'camera');
+            document.getElementById('virtual-section').classList.toggle('active', mode === 'virtual');
+            
+            if (mode === 'camera') {
+                // Keep video ready
+            } else {
+                stopCamera();
+            }
+        }
+        
+        function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('dragover'); }
+        function handleDragLeave(e) { e.currentTarget.classList.remove('dragover'); }
+        
+        function handleDrop(e) {
+            e.preventDefault();
+            e.currentTarget.classList.remove('dragover');
+            const files = Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/'));
+            addToQueue(files);
+        }
+        
+        function handleFileSelect(e) {
+            const files = Array.from(e.target.files);
+            addToQueue(files);
+            e.target.value = '';
+        }
+        
+        function handlePaste(e) {
+            if (currentMode !== 'virtual') return;
+            const items = Array.from(e.clipboardData.items);
+            const files = items.filter(i => i.type.includes('image'))
+                .map(i => new File([i.getAsFile()], `paste-${Date.now()}.png`, { type: i.type }));
+            if (files.length) addToQueue(files);
+        }
+        
+        async function addToQueue(files) {
+            for (const file of files) {
+                const img = new Image();
+                await new Promise((resolve, reject) => {
+                    img.onload = resolve;
+                    img.onerror = reject;
+                    img.src = URL.createObjectURL(file);
+                });
+                
+                imageQueue.push({
+                    file,
+                    img,
+                    status: 'pending', // pending, completed, error
+                    result: null
+                });
+            }
+            
+            updateQueueUI();
+            showToast(`已添加 ${files.length} 张图片`);
+            
+            // Auto select first if none selected
+            if (currentImageIndex === -1 && imageQueue.length > 0) {
+                selectImage(0);
+            }
+        }
+        
+        function updateQueueUI() {
+            const container = document.getElementById('queue-list');
+            const completed = imageQueue.filter(i => i.status === 'completed').length;
+            
+            document.getElementById('queue-section').style.display = imageQueue.length > 0 ? 'block' : 'none';
+            document.getElementById('queue-completed').textContent = completed;
+            document.getElementById('queue-total').textContent = imageQueue.length;
+            
+            container.innerHTML = '';
+            imageQueue.forEach((item, idx) => {
+                const el = document.createElement('div');
+                el.className = `queue-item ${item.status} ${idx === currentImageIndex ? 'active' : ''}`;
+                el.innerHTML = `
+                    <img src="${item.img.src}">
+                    <div class="queue-badge">${idx + 1}</div>
+                `;
+                el.onclick = () => selectImage(idx);
+                container.appendChild(el);
+            });
+        }
+        
+        function selectImage(index) {
+            if (index < 0 || index >= imageQueue.length) return;
+            
+            currentImageIndex = index;
+            const item = imageQueue[index];
+            
+            // Display image with correct aspect ratio
+            displayImage(item);
+            updateQueueUI();
+        }
+        
+        function displayImage(item) {
+            const container = document.getElementById('preview-container');
+            const canvas = document.getElementById('preview-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            // Get natural dimensions
+            const img = item.img;
+            const naturalWidth = img.naturalWidth;
+            const naturalHeight = img.naturalHeight;
+            
+            // Calculate display size (max width 800, maintain aspect ratio)
+            const maxWidth = Math.min(800, container.clientWidth || 800);
+            const scale = Math.min(maxWidth / naturalWidth, 1);
+            const width = naturalWidth * scale;
+            const height = naturalHeight * scale;
+            
+            // Set canvas size
+            canvas.width = width;
+            canvas.height = height;
+            
+            // Draw image
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            // Update container aspect ratio to match image
+            container.style.aspectRatio = `${width} / ${height}`;
+            
+            // Show section
+            document.getElementById('preview-section').classList.add('active');
+            document.getElementById('current-file').textContent = item.file.name;
+            document.getElementById('current-status').textContent = 
+                item.status === 'pending' ? '等待识别' : 
+                item.status === 'completed' ? '✓ 已识别' : '✗ 失败';
+        }
+        
+        async function scanCurrent() {
+            if (currentImageIndex === -1) return;
+            
+            const item = imageQueue[currentImageIndex];
+            document.getElementById('btn-scan').disabled = true;
+            document.getElementById('btn-scan').textContent = '⏳ 识别中...';
+            
+            try {
+                const canvas = document.getElementById('preview-canvas');
+                const result = await tryDecode(canvas);
+                
+                if (result) {
+                    handleQRCode(result);
+                    item.status = 'completed';
+                    item.result = result;
+                    showToast('✓ 识别成功');
+                    
+                    // Auto advance
+                    setTimeout(() => {
+                        if (currentImageIndex < imageQueue.length - 1) {
+                            selectImage(currentImageIndex + 1);
+                        }
+                    }, 500);
+                } else {
+                    item.status = 'error';
+                    showToast('未识别到二维码');
+                }
+            } catch (err) {
+                item.status = 'error';
+                showToast('识别失败');
+            }
+            
+            document.getElementById('btn-scan').disabled = false;
+            document.getElementById('btn-scan').textContent = '🔍 识别此图';
+            updateQueueUI();
+            displayImage(item); // Refresh status
+        }
+        
+        function nextImage() {
+            if (currentImageIndex < imageQueue.length - 1) {
+                selectImage(currentImageIndex + 1);
+            }
+        }
+        
+        function processQueue() {
+            // Process all pending images sequentially
+            const pending = imageQueue.map((item, idx) => ({ item, idx })).filter(({ item }) => item.status === 'pending');
+            
+            if (pending.length === 0) {
+                showToast('没有待处理的图片');
+                return;
+            }
+            
+            let index = 0;
+            async function processNext() {
+                if (index >= pending.length) {
+                    showToast('队列处理完成');
+                    return;
+                }
+                
+                const { idx } = pending[index];
+                selectImage(idx);
+                await scanCurrent();
+                index++;
+                
+                // Small delay between images
+                setTimeout(processNext, 300);
+            }
+            
+            processNext();
+        }
+        
+        function clearQueue() {
+            imageQueue = [];
+            currentImageIndex = -1;
+            document.getElementById('queue-section').style.display = 'none';
+            document.getElementById('preview-section').classList.remove('active');
+        }
+        
+        // ==================== Decoding ====================
+        async function tryDecode(source) {
+            // ZXing try
+            try {
+                const reader = new ZXing.BrowserQRCodeReader();
+                const result = await reader.decodeFromCanvas(source);
+                if (result) return result.getText();
+            } catch (e) {}
+            
+            // jsQR try with preprocessing
+            const ctx = source.getContext('2d');
+            const imageData = ctx.getImageData(0, 0, source.width, source.height);
+            
+            // Try original
+            let code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
+            if (code) return code.data;
+            
+            // Try preprocessed (grayscale)
+            const processed = preprocessImage(imageData);
+            code = jsQR(processed.data, processed.width, processed.height, { inversionAttempts: "attemptBoth" });
+            if (code) return code.data;
+            
+            return null;
+        }
+        
+        function preprocessImage(imageData) {
+            const data = imageData.data;
+            for (let i = 0; i < data.length; i += 4) {
+                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
+                const val = gray > 128 ? 255 : 0;
+                data[i] = data[i + 1] = data[i + 2] = val;
+            }
+            return imageData;
+        }
+        
+        // ==================== Data Handling ====================
+        function handleScanResult(text) {
+            handleQRCode(text);
+            // Visual feedback
+            const frame = document.querySelector('.scan-frame');
+            frame.style.borderColor = 'var(--success)';
+            setTimeout(() => frame.style.borderColor = '', 300);
+        }
+        
+        function handleQRCode(text) {
+            try {
+                const data = JSON.parse(text);
+                
+                if (data.t === 'fn') {
+                    fileInfo = {
+                        fingerprint: data.f,
+                        filename: atob(data.n),
+                        totalChunks: data.tc,
+                        size: data.s
+                    };
+                    saveProgress();
+                    showToast(`文件: ${fileInfo.filename}`);
+                    updateStatus();
+                } else if (data.i !== undefined && data.t && fileInfo && fileInfo.fingerprint === data.f) {
+                    if (!receivedChunks.has(data.i)) {
+                        receivedChunks.set(data.i, data.d);
+                        updateStatus();
+                        saveProgress();
+                        
+                        if (receivedChunks.size === fileInfo.totalChunks) {
+                            document.getElementById('btn-reassemble').disabled = false;
+                            showToast('🎉 接收完成！');
+                        }
+                    }
+                }
+            } catch (e) {
+                console.error('Parse error:', e);
+            }
+        }
+        
+        function updateStatus() {
+            if (!fileInfo) return;
+            const pct = Math.round((receivedChunks.size / fileInfo.totalChunks) * 100);
+            document.getElementById('progress-fill').style.width = pct + '%';
+            document.getElementById('progress-text').textContent = pct + '%';
+            document.getElementById('status-text').textContent = 
+                `已接收: ${receivedChunks.size}/${fileInfo.totalChunks}`;
+            
+            // Grid
+            const grid = document.getElementById('chunks-grid');
+            grid.innerHTML = '';
+            for (let i = 0; i < fileInfo.totalChunks; i++) {
+                const cell = document.createElement('div');
+                cell.className = 'chunk-cell';
+                if (receivedChunks.has(i)) cell.classList.add('filled');
+                cell.textContent = i + 1;
+                grid.appendChild(cell);
+            }
+        }
+        
+        // ==================== Storage ====================
+        async function saveProgress() {
+            await localforage.setItem('chunks', Array.from(receivedChunks.entries()));
+            await localforage.setItem('info', fileInfo);
+        }
+        
+        async function loadProgress() {
+            const chunks = await localforage.getItem('chunks');
+            const info = await localforage.getItem('info');
+            if (info) {
+                fileInfo = info;
+                receivedChunks = new Map(chunks || []);
+                updateStatus();
+                if (receivedChunks.size === fileInfo.totalChunks) {
+                    document.getElementById('btn-reassemble').disabled = false;
+                }
+            }
+        }
+        
+        // ==================== File Operations ====================
+        async function reassembleFile() {
+            if (!fileInfo || receivedChunks.size !== fileInfo.totalChunks) return;
+            
+            try {
+                const sorted = [];
+                for (let i = 0; i < fileInfo.totalChunks; i++) sorted.push(receivedChunks.get(i));
+                
+                const binary = atob(sorted.join(''));
+                const bytes = new Uint8Array(binary.length);
+                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                
+                const decompressed = pako.inflate(bytes);
+                const blob = new Blob([decompressed]);
+                
+                await localforage.setItem('file', blob);
+                await localforage.setItem('fileInfo', fileInfo);
+                
+                document.getElementById('btn-download').disabled = false;
+                showToast('✓ 重组完成');
+            } catch (err) {
+                showToast('重组失败: ' + err.message);
+            }
+        }
+        
+        async function downloadFile() {
+            const blob = await localforage.getItem('file');
+            const info = await localforage.getItem('fileInfo');
+            if (!blob || !info) return;
+            
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = info.filename;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+        
+        function showToast(msg) {
+            const toast = document.getElementById('toast');
+            toast.textContent = msg;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+        
+        window.addEventListener('beforeunload', () => stopCamera());
+    </script>
+</body>
+</html>

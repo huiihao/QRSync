@@ -1,4 +1,4 @@
-# QRBridge
+# QRSync_Offline
 
 <p align="center">
   <img src="https://img.shields.io/badge/纯浏览器-实现-brightgreen" alt="纯浏览器实现">
@@ -8,7 +8,7 @@
 </p>
 
 <p align="center">
-  <b>QRBridge</b> 是一个纯浏览器实现的、完全离线的文件传输工具，通过二维码序列在没有网络连接的环境下传输文件。
+  <b>QRSync_Offline</b> 是一个纯浏览器实现的、完全离线的文件传输工具，通过二维码序列在没有网络连接的环境下传输文件。
 </p>
 
 <p align="center">
@@ -23,7 +23,7 @@
 
 ## 🌐 在线体验
 
-**👉 [点击访问 QRBridge](https://qrbridge-demo.vercel.app)**
+**👉 [点击访问 QRSync_Offline](https://QRSync_Offline-demo.vercel.app)**
 
 > 页面加载完成后，即可断开网络离线使用。
 
@@ -135,10 +135,10 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/QRBridge.git
+git clone https://github.com/yourusername/QRSync_Offline.git
 
 # 进入项目目录
-cd QRBridge
+cd QRSync_Offline
 
 # 启动本地服务器（Python 3）
 python -m http.server 8080
@@ -154,7 +154,7 @@ npx serve .
 ## 📂 项目结构
 
 ```
-QRBridge/
+QRSync_Offline/
 ├── index.html           # 首页入口
 ├── send/
 │   └── index.html       # 发送端
@@ -229,5 +229,5 @@ QRBridge/
 ---
 
 <p align="center">
-  Made with ❤️ by QRBridge Team
+  Made with ❤️ by QRSync_Offline Team
 </p>
