@@ -1380,27 +1380,69 @@
         
         async function reassembleFile() {
             if (!fileInfo || receivedChunks.size < fileInfo.totalChunks) return;
+            
             try {
                 document.getElementById('btn-reassemble').disabled = true;
                 document.getElementById('btn-reassemble').textContent = '⏳ 重组中...';
+                
                 const sorted = [];
                 for (let i = 0; i < fileInfo.totalChunks; i++) {
                     const data = receivedChunks.get(i);
                     if (!data) throw new Error(`缺少分片 ${i + 1}`);
-                    sorted.push(data);
+                    
+                    // 清洗数据：移除所有非 Base64 字符，处理 URL-safe Base64
+                    let cleanData = data.toString()
+                        .replace(/[^A-Za-z0-9+/=_-]/g, '')  // 移除非 Base64 字符
+                        .replace(/-/g, '+')                  // URL-safe -> 标准
+                        .replace(/_/g, '/');
+                    
+                    // 修复 padding
+                    const padLength = (4 - (cleanData.length % 4)) % 4;
+                    cleanData += '='.repeat(padLength);
+                    
+                    sorted.push(cleanData);
                 }
+                
                 const combinedBase64 = sorted.join('');
-                let binary = atob(combinedBase64);
+                
+                // 验证拼接后的 Base64
+                if (!/^[A-Za-z0-9+/=]+$/.test(combinedBase64)) {
+                    throw new Error('合并后的数据包含非法字符');
+                }
+                
+                let binary;
+                try {
+                    binary = atob(combinedBase64);
+                } catch (e) {
+                    // 定位具体是哪个分片有问题
+                    for (let i = 0; i < sorted.length; i++) {
+                        try {
+                            atob(sorted[i]);
+                        } catch (err) {
+                            throw new Error(`分片 ${i+1} Base64 解码失败: ${err.message}`);
+                        }
+                    }
+                    throw e;
+                }
+                
                 const bytes = new Uint8Array(binary.length);
                 for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+                
                 let decompressed;
-                try { decompressed = pako.inflate(bytes); } catch (e) { decompressed = bytes; }
+                try { 
+                    decompressed = pako.inflate(bytes); 
+                } catch (e) { 
+                    decompressed = bytes; 
+                }
+                
                 const blob = new Blob([decompressed]);
                 const store = localforage.createInstance({ name: 'qrcode-receiver-v2' });
                 await store.setItem('fileBlob', blob);
                 document.getElementById('btn-download').disabled = false;
                 showToast('✓ 重组完成');
+                
             } catch (err) {
+                console.error('重组错误:', err);
                 showToast('重组失败: ' + err.message);
                 document.getElementById('btn-reassemble').disabled = false;
             } finally {
