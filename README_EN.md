@@ -14,7 +14,7 @@
 </p>
 
 <p align="center">
-  <b>QRSyncOffline</b> is a pure browser-based, fully offline file transfer tool that transmits files via QR code sequences without requiring a network connection.
+  <b>QRSyncOffline</b> is a pure browser-based, fully offline file transfer tool that transmits files via QR code sequences in air-gapped environments without network connectivity, USB device access, clipboard usage, and with only a visual interface available.
 </p>
 
 <p align="center">
@@ -44,7 +44,7 @@
 | Feature | Description |
 |------|------|
 | 🌐 **Pure Browser Implementation** | No software installation required, no server needed |
-| 📶 **Fully Offline Working** | Can be used completely without network connection |
+| 📶 **Fully Offline Working** | Operates fully offline under air-gapped conditions |
 | 🔒 **Data Integrity Check** | Uses CRC32 checksum to ensure accurate data transmission |
 | 📁 **Supports Any File Type** | Text, images, documents, archives, etc. can all be transferred |
 | 🇨🇳 **Perfect Chinese Support** | Supports Chinese filenames without garbled text issues |
