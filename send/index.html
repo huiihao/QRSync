@@ -6,9 +6,10 @@
     <title>QRSyncOffline - 发送端</title>
     <script src="js/pako.min.js"></script>
     <script src="js/qrcode.min.js"></script>
-    <!-- 添加 JSZip 和 FileSaver 用于批量下载 -->
-    <script src="js/jszip.min.js"></script>
-    <script src="jd/FileSaver.min.js"></script>
+    <!-- JSZip 用于批量打包 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <!-- FileSaver 作为备选，如果加载失败则使用原生下载 -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -312,7 +313,6 @@
             color: var(--text-secondary);
         }
         
-        /* 滑块变更提示 */
         .slider-hint {
             font-size: 13px;
             color: var(--warning);
@@ -511,7 +511,6 @@
             border: 3px solid var(--warning);
         }
         
-        /* QR尺寸实时预览适应 */
         #qrcode img, #qrcode canvas {
             max-width: 100%;
             height: auto;
@@ -701,6 +700,8 @@
             opacity: 0;
             transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
             z-index: 10000;
+            text-align: center;
+            max-width: 80%;
         }
         
         .toast.show {
@@ -723,21 +724,17 @@
             to { transform: rotate(360deg); }
         }
         
-        /* Responsive */
         @media (max-width: 734px) {
             .page-header h1 {
                 font-size: 32px;
             }
-            
             .card {
                 padding: 24px;
             }
-            
             .btn {
                 width: 100%;
                 min-width: unset;
             }
-            
             .qr-container {
                 padding: 20px;
             }
@@ -800,7 +797,7 @@
                 传输设置
             </div>
             
-            <div class="slider-container" id="chunkSizeContainer">
+            <div class="slider-container">
                 <div class="slider-header">
                     <span class="slider-label">分片大小</span>
                     <span class="slider-value" id="chunkSizeValue">800 B</span>
@@ -814,7 +811,7 @@
                 <div class="slider-hint" id="chunkSizeHint">⚠️ 更改此设置需要重新生成二维码</div>
             </div>
             
-            <div class="slider-container" id="qrSizeContainer">
+            <div class="slider-container">
                 <div class="slider-header">
                     <span class="slider-label">二维码尺寸</span>
                     <span class="slider-value" id="qrSizeValue">400 px</span>
@@ -910,7 +907,7 @@
         </div>
     </div>
     
-    <div class="toast" id="toast">已复制到剪贴板</div>
+    <div class="toast" id="toast"></div>
 
     <script>
         // ==================== 配置和常量 ====================
@@ -937,7 +934,7 @@
         let fileNameQrCode = null;
         let autoplayInterval = null;
         let isPlaying = false;
-        let hasGenerated = false; // 标记是否已生成过二维码
+        let hasGenerated = false;
 
         // ==================== DOM 元素 ====================
         const uploadArea = document.getElementById('uploadArea');
@@ -1025,6 +1022,27 @@
             });
         }
 
+        // 安全的文件保存函数（支持 FileSaver 或原生方案）
+        function saveFile(blob, filename) {
+            // 优先使用 FileSaver.js
+            if (typeof saveAs === 'function') {
+                saveAs(blob, filename);
+                return;
+            }
+            
+            // 备用方案：使用原生下载
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            
+            // 延迟释放 URL 对象
+            setTimeout(() => URL.revokeObjectURL(url), 100);
+        }
+
         function showToast(message, duration = 3000) {
             toast.textContent = message;
             toast.classList.add('show');
@@ -1087,7 +1105,6 @@
             fileInfo.style.display = 'block';
             generateBtn.disabled = false;
             
-            // 重置生成状态
             hasGenerated = false;
             hideRegenerateHints();
             
@@ -1096,7 +1113,7 @@
             showToast('文件选择成功');
         }
 
-        // 滑块事件 - 分片大小（需要重新处理文件）
+        // 滑块事件
         const chunkSizeSlider = document.getElementById('chunkSizeSlider');
         const chunkSizeValue = document.getElementById('chunkSizeValue');
         const chunkSizeHint = document.getElementById('chunkSizeHint');
@@ -1111,7 +1128,6 @@
             }
         });
 
-        // 滑块事件 - QR尺寸（只需要重新生成，不需要重新处理文件）
         const qrSizeSlider = document.getElementById('qrSizeSlider');
         const qrSizeValue = document.getElementById('qrSizeValue');
         const qrSizeHint = document.getElementById('qrSizeHint');
@@ -1120,7 +1136,6 @@
             CONFIG.QR_SIZE = parseInt(this.value);
             qrSizeValue.textContent = CONFIG.QR_SIZE + ' px';
             
-            // 如果已经生成，提示需要重新生成才能看到效果
             if (hasGenerated) {
                 qrSizeHint.classList.add('show');
             }
@@ -1136,11 +1151,11 @@
             const estimatedCompressedSize = file.size * 0.6;
             const estimated = Math.ceil(estimatedCompressedSize / CONFIG.CHUNK_SIZE);
             document.getElementById('estimatedChunks').textContent = (estimated + 1) + ' 个';
-            const percentage = Math.min(estimated / 100 * 100, 100); // 假设100个为满
+            const percentage = Math.min(estimated / 100 * 100, 100);
             document.getElementById('estimationBar').style.width = percentage + '%';
         }
 
-        // 生成二维码按钮
+        // 生成二维码
         generateBtn.addEventListener('click', async () => {
             if (!file) {
                 showStatus('请先选择文件', 'error');
@@ -1222,7 +1237,6 @@
                 
                 if (i % Math.max(1, Math.floor(totalChunks / 10)) === 0) {
                     showStatus(`分片进度: ${i+1}/${totalChunks}`, 'info');
-                    // 让UI有机会刷新
                     await new Promise(resolve => setTimeout(resolve, 10));
                 }
             }
@@ -1335,7 +1349,6 @@
             
             qrContainer.className = isFilenameQR ? 'qr-container filename-qr' : 'qr-container data-qr';
             
-            // 使用当前 CONFIG.QR_SIZE 确保尺寸设置生效
             new QRCode(document.getElementById('qrcode'), {
                 text: JSON.stringify(qrData.data),
                 width: CONFIG.QR_SIZE,
@@ -1357,11 +1370,11 @@
             
             // 更新网格高亮
             document.querySelectorAll('.chunk-dot').forEach((dot, i) => {
+                dot.classList.remove('generated');
                 if (i === index) {
                     dot.classList.add('generated');
                     dot.classList.remove('pending');
                 } else if (i < chunks.length) {
-                    dot.classList.remove('generated');
                     dot.classList.add('pending');
                 }
             });
@@ -1392,17 +1405,14 @@
                 return;
             }
             
-            const link = document.createElement('a');
-            const isFilename = currentChunkIndex === qrCodes.length - 1;
-            const filename = isFilename 
+            const filename = (currentChunkIndex === qrCodes.length - 1)
                 ? `qrcode_${fileFingerprint}_filename.png` 
                 : `qrcode_${fileFingerprint}_${String(currentChunkIndex + 1).padStart(3, '0')}.png`;
             
-            link.download = filename;
-            link.href = canvas.toDataURL('image/png');
-            link.click();
-            
-            showToast('已开始下载当前二维码');
+            canvas.toBlob(blob => {
+                saveFile(blob, filename);
+                showToast('已开始下载当前二维码');
+            }, 'image/png');
         }
 
         // 批量下载所有二维码
@@ -1411,16 +1421,21 @@
         async function downloadAllQRCodes() {
             if (!qrCodes.length) return;
             
+            // 确保 JSZip 已加载
             if (typeof JSZip === 'undefined') {
                 showStatus('正在加载 ZIP 库，请稍候...', 'info');
-                // 动态加载 JSZip（如果 CDN 失败）
-                await new Promise((resolve, reject) => {
-                    const script = document.createElement('script');
-                    script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
-                    script.onload = resolve;
-                    script.onerror = reject;
-                    document.head.appendChild(script);
-                });
+                try {
+                    await new Promise((resolve, reject) => {
+                        const script = document.createElement('script');
+                        script.src = 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js';
+                        script.onload = resolve;
+                        script.onerror = () => reject(new Error('无法加载 JSZip'));
+                        document.head.appendChild(script);
+                    });
+                } catch (e) {
+                    showStatus('加载 ZIP 库失败，请检查网络连接', 'error');
+                    return;
+                }
             }
             
             const zip = new JSZip();
@@ -1433,15 +1448,16 @@
             showStatus('正在打包所有二维码，请稍候...', 'info');
             
             try {
-                // 重新生成所有二维码以捕获图像（不显示在 DOM 中）
+                // 重新生成所有二维码以捕获图像
                 for (let i = 0; i < qrCodes.length; i++) {
                     const qr = qrCodes[i];
                     const isFilename = qr.type === CONFIG.PACKET_TYPES.FILENAME;
                     
-                    // 创建临时容器
+                    // 创建临时容器（隐藏）
                     const tempDiv = document.createElement('div');
                     tempDiv.style.position = 'absolute';
                     tempDiv.style.left = '-9999px';
+                    tempDiv.style.top = '-9999px';
                     document.body.appendChild(tempDiv);
                     
                     new QRCode(tempDiv, {
@@ -1454,7 +1470,7 @@
                     });
                     
                     // 等待生成完成
-                    await new Promise(resolve => setTimeout(resolve, 100));
+                    await new Promise(resolve => setTimeout(resolve, 50));
                     
                     const canvas = tempDiv.querySelector('canvas');
                     if (canvas) {
@@ -1467,7 +1483,7 @@
                     
                     document.body.removeChild(tempDiv);
                     
-                    // 更新进度
+                    // 更新进度（每10个或最后一个）
                     if (i % 10 === 0 || i === qrCodes.length - 1) {
                         showStatus(`打包进度: ${i+1}/${qrCodes.length}`, 'info');
                     }
@@ -1481,7 +1497,7 @@
                 showStatus('正在生成 ZIP 文件...', 'info');
                 const content = await zip.generateAsync({type: "blob"});
                 
-                saveAs(content, `qrcodes_${fileFingerprint}.zip`);
+                saveFile(content, `qrcodes_${fileFingerprint}.zip`);
                 showStatus(`✅ 已生成 ${qrCodes.length} 个二维码`, 'success');
                 showToast('ZIP 文件下载已开始');
             } catch (error) {
