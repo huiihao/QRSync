@@ -68,7 +68,7 @@
 
 <div align="center">
 <!-- <img width="70%" alt="image" src="https://github.com/user-attachments/assets/b2fe4202-e958-41d4-9720-6c30c2fd4970" /> -->
-  <img width="70%" height="1040" alt="image" src="https://github.com/user-attachments/assets/9d414f06-e5d2-4359-9581-79d0a37b3801" />
+  <img width="70%" height="70%" alt="image" src="https://github.com/user-attachments/assets/9d414f06-e5d2-4359-9581-79d0a37b3801" />
 </div>
 
 ### 接收文件
