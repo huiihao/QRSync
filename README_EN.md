@@ -35,7 +35,7 @@
 > After downloading the repository zip file and loading the JavaScript, you can disconnect from the network and use it offline.
 
 <div align="center">
-  <img width="80%" alt="image" src="https://github.com/user-attachments/assets/fa9f4abb-217a-4cd9-8991-4e1be9d85cf4" />
+  <img width="80%" alt="image" src="https://github.com/user-attachments/assets/90debdb9-1205-4e0b-9ab4-df1aad5f5357" />
 </div>
 
 ---
