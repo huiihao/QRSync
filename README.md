@@ -58,7 +58,7 @@
 
 ### 发送文件
 
-1. 打开 **[发送端](https://huiihao.github.io/QRSync/send/index.html)**
+1. 打开 **[发送端](https://huiihao.github.io/QRSync/sender/index.html)**
 2. 点击或拖拽选择要传输的文件
 3. 调整分片大小和二维码尺寸（可选）
 4. 点击"生成二维码"按钮
@@ -153,7 +153,7 @@
 
 ```bash
 # 克隆仓库
-git clone https://github.com/yourusername/QRSync.git
+git clone https://github.com/huiihao/QRSync.git
 
 # 进入项目目录
 cd QRSync
@@ -172,9 +172,9 @@ npx serve .
 ## 📦 项目结构
 
 ```
-QRSync-Fixed/
+QRSync/
 ├── index.html          # 入口页面
-├── send/
+├── sender/
 │   └── index.html      # 发送端
 ├── receiver/
 │   └── index.html      # 接收端
@@ -205,13 +205,13 @@ QRSync-Fixed/
 
 ### 分片大小
 
-- **范围**: 400 - 1500 字节
-- **默认值**: 800 字节
+- **范围**: 400 - 1200 字节
+- **默认值**: 600 字节
 - **建议**: 较小的分片可提高扫描成功率，但会增加二维码数量
 
 ### 二维码尺寸
 
-- **范围**: 256 - 600 像素
+- **范围**: 256 - 800 像素
 - **默认值**: 400 像素
 - **建议**: 根据屏幕尺寸和扫描距离调整
 

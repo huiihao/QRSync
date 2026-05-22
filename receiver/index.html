@@ -10,6 +10,7 @@
     <script src="../js/pako.min.js"></script>
     <script src="../js/localforage.min.js"></script>
     <script src="../js/jsQR.js"></script>
+    <script src="../js/protocol.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -742,10 +743,17 @@
             border-color: transparent;
         }
         
-        .chunk-cell.filename { 
+        .chunk-cell.filename {
             background: linear-gradient(135deg, var(--warning), #ff6b35);
             color: white;
             border-color: transparent;
+        }
+
+        .chunk-cell.crc-fail {
+            background: rgba(239, 71, 111, 0.7);
+            color: white;
+            border-color: var(--error);
+            animation: chunk-pop 0.3s ease;
         }
         
         @keyframes chunk-pop {
@@ -985,63 +993,68 @@
 
     <script>
         // ==================== Global State ====================
+        const PROTO = window.QRPROTO || {};
+        const PACKET_TYPES = (PROTO && PROTO.PACKET_TYPES) ? PROTO.PACKET_TYPES : { DATA: 'data', FILENAME: 'fn' };
+
         let codeReader = null;
         let scanControls = null;
         let isScanning = false;
         let currentMode = 'camera';
-        
+
         let receivedChunks = new Map();
+        let failedChunks = new Set();
         let fileInfo = null;
         let currentFileFingerprint = null;
         let receivedFileName = '';
-        
+
         let lastDecodedText = '';
         let lastScanTime = 0;
-        
+
         let imageQueue = [];
         let currentImageIndex = -1;
 
-        // ==================== CRC32 (与发送端完全一致) ====================
+        // ==================== CRC32 (使用共享协议库) ====================
         function calculateCRC32(data) {
-            if (typeof pako !== 'undefined' && pako.crc32) {
-                const crc = pako.crc32(data);
-                return crc.toString(36).padStart(5, '0').slice(-5).toLowerCase();
-            }
-            
-            const table = new Uint32Array(256);
-            for (let i = 0; i < 256; i++) {
-                let c = i;
-                for (let j = 0; j < 8; j++) {
-                    c = (c & 1) ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+            return (PROTO.calculateCRC32 || function(d) {
+                if (typeof pako !== 'undefined' && pako.crc32) {
+                    return pako.crc32(d).toString(36).padStart(5, '0').slice(-5).toLowerCase();
                 }
-                table[i] = c;
-            }
-            
-            let crc = 0xFFFFFFFF;
-            for (let i = 0; i < data.length; i++) {
-                crc = (crc >>> 8) ^ table[(crc ^ data.charCodeAt(i)) & 0xFF];
-            }
-            crc = (crc ^ 0xFFFFFFFF) >>> 0;
-            return crc.toString(36).padStart(5, '0').slice(-5).toLowerCase();
+                const table = new Uint32Array(256);
+                for (let i = 0; i < 256; i++) {
+                    let c = i;
+                    for (let j = 0; j < 8; j++) {
+                        c = (c & 1) ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+                    }
+                    table[i] = c;
+                }
+                let crc = 0xFFFFFFFF;
+                for (let i = 0; i < d.length; i++) {
+                    crc = (crc >>> 8) ^ table[(crc ^ d.charCodeAt(i)) & 0xFF];
+                }
+                crc = (crc ^ 0xFFFFFFFF) >>> 0;
+                return crc.toString(36).padStart(5, '0').slice(-5).toLowerCase();
+            })(data);
         }
 
-        // ==================== 文件名解码 (与发送端配对) ====================
+        // ==================== 文件名解码 (使用共享协议库) ====================
         function decodeFileName(base64Name) {
-            try {
-                const binaryStr = atob(base64Name);
-                const bytes = new Uint8Array(binaryStr.length);
-                for (let i = 0; i < binaryStr.length; i++) {
-                    bytes[i] = binaryStr.charCodeAt(i);
-                }
-                const decoder = new TextDecoder('utf-8');
-                return decoder.decode(bytes);
-            } catch (e) {
+            return (PROTO.decodeFileName || function(bn) {
                 try {
-                    return decodeURIComponent(atob(base64Name));
-                } catch (e2) {
-                    return base64Name;
+                    const binaryStr = atob(bn);
+                    const bytes = new Uint8Array(binaryStr.length);
+                    for (let i = 0; i < binaryStr.length; i++) {
+                        bytes[i] = binaryStr.charCodeAt(i);
+                    }
+                    const decoder = new TextDecoder('utf-8');
+                    return decoder.decode(bytes);
+                } catch (e) {
+                    try {
+                        return decodeURIComponent(atob(bn));
+                    } catch (e2) {
+                        return bn;
+                    }
                 }
-            }
+            })(base64Name);
         }
         
         // ==================== Init ====================
@@ -1070,14 +1083,19 @@
                 if (isScanning) await stopCamera();
                 
                 receivedChunks.clear();
+                failedChunks.clear();
                 fileInfo = null;
                 currentFileFingerprint = null;
                 receivedFileName = '';
                 imageQueue = [];
                 currentImageIndex = -1;
-                
+
                 const store = localforage.createInstance({ name: 'qrcode-receiver-v2' });
                 await store.clear();
+                try {
+                    const legacyStore = localforage.createInstance({ name: 'qrcode-receiver' });
+                    await legacyStore.clear();
+                } catch (e) { /* ignore */ }
                 
                 document.getElementById('fingerprint-display').style.display = 'none';
                 document.getElementById('fingerprint-value').textContent = '未设置';
@@ -1231,19 +1249,19 @@
         // ==================== 核心数据处理函数 ====================
         async function processChunkData(data) {
             try {
-                // 数据清洗
-                let trimmed = data.trim();
-                if (!trimmed.startsWith('{') && trimmed.includes('{')) {
-                    trimmed = trimmed.substring(trimmed.indexOf('{'));
-                }
-                if (!trimmed.endsWith('}') && trimmed.includes('}')) {
-                    trimmed = trimmed.substring(0, trimmed.lastIndexOf('}') + 1);
-                }
-                if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
-                    throw new Error('数据格式错误');
-                }
-                
-                let chunk = JSON.parse(trimmed);
+                let chunk = (PROTO.parseChunk || function(raw) {
+                    let trimmed = raw.trim();
+                    if (!trimmed.startsWith('{') && trimmed.includes('{')) {
+                        trimmed = trimmed.substring(trimmed.indexOf('{'));
+                    }
+                    if (!trimmed.endsWith('}') && trimmed.includes('}')) {
+                        trimmed = trimmed.substring(0, trimmed.lastIndexOf('}') + 1);
+                    }
+                    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
+                        throw new Error('数据格式错误');
+                    }
+                    return JSON.parse(trimmed);
+                })(data);
                 
                 // 文件名二维码处理
                 if (chunk.t === 'fn') {
@@ -1304,9 +1322,13 @@
                     
                     // CRC32校验 - 对数据字段
                     if (calculateCRC32(chunk.d) !== chunk.h.toLowerCase()) {
+                        failedChunks.add(chunk.i);
+                        updateUI();
                         showFloatingMessage(`❌ 分片 ${chunk.i+1} 校验失败`, true);
                         return;
                     }
+
+                    failedChunks.delete(chunk.i);
                     
                     if (receivedChunks.has(chunk.i)) {
                         showFloatingMessage(`⚠️ 分片 ${chunk.i+1}/${chunk.t} 已接收过`);
@@ -1325,9 +1347,9 @@
                 }
                 
                 // 检查是否完成
-                if (fileInfo && fileInfo.totalChunks > 0 && receivedChunks.size >= fileInfo.totalChunks && fileInfo.filename !== '未知文件') {
+                if (fileInfo && fileInfo.totalChunks > 0 && receivedChunks.size >= fileInfo.totalChunks) {
                     document.getElementById('btn-reassemble').disabled = false;
-                    showFloatingMessage('🎉 接收完成！');
+                    showFloatingMessage(fileInfo.filename !== '未知文件' ? '🎉 接收完成！' : '📦 数据块已全部接收（可重组下载）');
                     setTimeout(() => stopCamera(), 500);
                 }
             } catch (err) {
@@ -1451,7 +1473,7 @@
                 const height = canvas.height;
                 
                 // 提取扫描框区域（70%中心区域）
-                const scanAreaRatio = 1.00;
+                const scanAreaRatio = 0.70;
                 const startX = Math.floor((width * (1 - scanAreaRatio)) / 2);
                 const startY = Math.floor((height * (1 - scanAreaRatio)) / 2);
                 const scanWidth = Math.floor(width * scanAreaRatio);
@@ -1583,7 +1605,7 @@
             
             updateChunksDisplay();
             
-            if (receivedChunks.size >= fileInfo.totalChunks && fileInfo.filename !== '未知文件') {
+            if (receivedChunks.size >= fileInfo.totalChunks) {
                 document.getElementById('btn-reassemble').disabled = false;
             }
         }
@@ -1597,7 +1619,9 @@
             let html = '';
             for (let i = 0; i < fileInfo.totalChunks; i++) {
                 const isReceived = receivedChunks.has(i);
-                html += `<div class="chunk-cell ${isReceived ? 'filled' : ''}" title="数据分片 ${i + 1}${isReceived ? ' (已接收)' : ' (未接收)'}">${i + 1}</div>`;
+                const isFailed = failedChunks.has(i) && !isReceived;
+                const cls = isFailed ? 'crc-fail' : (isReceived ? 'filled' : '');
+                html += `<div class="chunk-cell ${cls}" title="数据分片 ${i + 1}${isFailed ? ' (校验失败需重扫)' : (isReceived ? ' (已接收)' : ' (未接收)')}">${i + 1}</div>`;
             }
             if (fileInfo?.filename !== '未知文件') {
                 html += `<div class="chunk-cell filename" title="文件名分片 (已接收)">📄</div>`;
@@ -1620,32 +1644,55 @@
         async function loadProgress() {
             try {
                 const store = localforage.createInstance({ name: 'qrcode-receiver-v2' });
-                const chunks = await store.getItem('chunks');
-                const info = await store.getItem('fileInfo');
-                const fp = await store.getItem('fingerprint');
-                const fn = await store.getItem('filename');
-                
+                let chunks = await store.getItem('chunks');
+                let info = await store.getItem('fileInfo');
+                let fp = await store.getItem('fingerprint');
+                let fn = await store.getItem('filename');
+
+                // 迁移 v1 数据
+                if (!info) {
+                    try {
+                        const legacyStore = localforage.createInstance({ name: 'qrcode-receiver' });
+                        const legacyInfo = await legacyStore.getItem('fileInfo');
+                        if (legacyInfo) {
+                            info = legacyInfo;
+                            chunks = await legacyStore.getItem('chunks');
+                            fp = await legacyStore.getItem('fingerprint');
+                            fn = await legacyStore.getItem('filename');
+                            // 保存到 v2
+                            await store.setItem('chunks', chunks);
+                            await store.setItem('fileInfo', info);
+                            await store.setItem('fingerprint', fp);
+                            await store.setItem('filename', fn);
+                            await legacyStore.clear();
+                            console.log('已从 v1 迁移数据到 v2');
+                        }
+                    } catch (e) {
+                        console.log('无 v1 数据或迁移失败:', e.message);
+                    }
+                }
+
                 if (info) {
                     fileInfo = info;
                     receivedChunks = new Map(chunks || []);
                     currentFileFingerprint = fp || info.fingerprint;
                     receivedFileName = fn || info.filename;
-                    
+
                     document.getElementById('fingerprint-display').style.display = 'block';
                     document.getElementById('fingerprint-value').textContent = currentFileFingerprint;
-                    
+
                     updateUI();
-                    
-                    if (receivedChunks.size >= fileInfo.totalChunks && fileInfo.filename !== '未知文件') {
+
+                    if (receivedChunks.size >= fileInfo.totalChunks) {
                         document.getElementById('btn-reassemble').disabled = false;
                     }
-                    
+
                     showToast('✅ 数据已恢复');
                 } else {
                     showToast('没有保存的数据');
                 }
-            } catch (err) { 
-                console.error('加载失败:', err); 
+            } catch (err) {
+                console.error('加载失败:', err);
             }
         }
         
@@ -1679,6 +1726,17 @@
                 const store = localforage.createInstance({ name: 'qrcode-receiver-v2' });
                 await store.setItem('fileBlob', blob);
                 
+                if (fileInfo.filename === '未知文件') {
+                    const now = new Date();
+                    const ts = now.getFullYear() +
+                        String(now.getMonth() + 1).padStart(2, '0') +
+                        String(now.getDate()).padStart(2, '0') + '_' +
+                        String(now.getHours()).padStart(2, '0') +
+                        String(now.getMinutes()).padStart(2, '0') +
+                        String(now.getSeconds()).padStart(2, '0');
+                    fileInfo.filename = 'qrsync_download_' + ts;
+                }
+
                 document.getElementById('btn-download').disabled = false;
                 showToast('✓ 重组完成');
             } catch (err) {

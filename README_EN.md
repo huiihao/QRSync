@@ -59,7 +59,7 @@
 
 ### Sending Files
 
-1. Open the **[Sender Page](https://huiihao.github.io/QRSync/send/index.html)**
+1. Open the **[Sender Page](https://huiihao.github.io/QRSync/sender/index.html)**
 2. Click or drag to select the file to transfer
 3. Adjust chunk size and QR code dimensions (optional)
 4. Click the "Generate QR Codes" button
@@ -154,7 +154,7 @@
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/QRSync.git
+git clone https://github.com/huiihao/QRSync.git
 
 # Enter project directory
 cd QRSync
@@ -173,9 +173,9 @@ npx serve .
 ## 📦 Project Structure
 
 ```
-QRSync-Fixed/
+QRSync/
 ├── index.html          # Entry page
-├── send/
+├── sender/
 │   └── index.html      # Sender page
 ├── receiver/
 │   └── index.html      # Receiver page
@@ -206,13 +206,13 @@ Refer to [docs/PACKAGING.md](docs/PACKAGING.md) for instructions on packaging th
 
 ### Chunk Size
 
-- **Range**: 400 - 1500 bytes
-- **Default**: 800 bytes
+- **Range**: 400 - 1200 bytes
+- **Default**: 600 bytes
 - **Recommendation**: Smaller chunks improve scanning success rate but increase QR code count
 
 ### QR Code Dimensions
 
-- **Range**: 256 - 600 pixels
+- **Range**: 256 - 800 pixels
 - **Default**: 400 pixels
 - **Recommendation**: Adjust based on screen size and scanning distance
 

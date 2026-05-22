@@ -9,6 +9,7 @@
     <script src="../js/qrcode.min.js"></script>
     <script src="../js/jszip.min.js"></script>
     <script src="../js/FileSaver.min.js"></script>
+    <script src="../js/protocol.js"></script>
     <style>
         * {
             box-sizing: border-box;
@@ -382,6 +383,19 @@
         .slider-hint.show {
             display: block;
         }
+
+        .size-warning {
+            font-size: 13px;
+            color: var(--warning);
+            margin-top: 12px;
+            display: none;
+            text-align: center;
+            padding: 10px 16px;
+            background: rgba(255, 159, 28, 0.1);
+            border-radius: 10px;
+            border: 1px solid rgba(255, 159, 28, 0.3);
+        }
+        .size-warning.show { display: block; }
         
         /* Progress */
         .progress-section {
@@ -538,6 +552,23 @@
             border-color: rgba(239, 71, 111, 0.3);
         }
         
+        /* Color scheme toggle */
+        .color-scheme-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 16px;
+            padding: 16px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 16px;
+            border: 1px solid var(--border-glass);
+        }
+        .color-scheme-toggle .toggle-label {
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+
         /* QR Section */
         .qr-section {
             display: none;
@@ -937,6 +968,10 @@
                 <div class="slider-hint" id="qrSizeHint">⚠️ 更改此设置需要重新点击"生成二维码"</div>
             </div>
             
+            <div class="size-warning" id="sizeWarning">
+                ⚠️ 文件较大，预计生成 <span id="warnChunkCount">0</span> 个二维码。建议调大分片大小或压缩文件后再传输。
+            </div>
+
             <div class="progress-section">
                 <div class="progress-header">
                     <span class="progress-label">预估二维码数量</span>
@@ -981,6 +1016,15 @@
                     <span class="toggle-slider"></span>
                 </label>
                 <span class="toggle-label" id="autoplayStatus">关闭</span>
+            </div>
+
+            <div class="color-scheme-toggle" id="colorSchemeToggle">
+                <span class="toggle-label">彩色模式</span>
+                <label class="toggle">
+                    <input type="checkbox" id="colorSchemeCheckbox" checked>
+                    <span class="toggle-slider"></span>
+                </label>
+                <span class="toggle-label" id="colorSchemeStatus">彩色</span>
             </div>
             
             <div class="qr-controls">
@@ -1029,10 +1073,8 @@
             MAX_JSON_SIZE: 1800,
             QR_MAX_CAPACITY: 2953,
             AUTOPLAY_INTERVAL: 2000,
-            PACKET_TYPES: {
-                DATA: 'data',
-                FILENAME: 'fn'
-            }
+            COLOR_SCHEME: 'color',
+            LARGE_FILE_THRESHOLD: 1500
         };
 
         // ==================== 状态变量 ====================
@@ -1062,59 +1104,68 @@
         const downloadSection = document.getElementById('downloadSection');
 
         // ==================== 工具函数 ====================
+        const PROTO = window.QRPROTO || {};
+        const PACKET_TYPES = (PROTO && PROTO.PACKET_TYPES) ? PROTO.PACKET_TYPES : { DATA: 'data', FILENAME: 'fn' };
+
         function generateShortFileId() {
-            const timestamp = Date.now();
-            const random = Math.floor(Math.random() * 46656);
-            const combined = (timestamp % 60466176) * 1000 + random;
-            return combined.toString(36).padStart(5, '0').slice(-5).toUpperCase();
+            return (PROTO.generateShortFileId || function() {
+                const timestamp = Date.now();
+                const random = Math.floor(Math.random() * 46656);
+                const combined = (timestamp % 60466176) * 1000 + random;
+                return combined.toString(36).padStart(5, '0').slice(-5).toUpperCase();
+            })();
         }
 
         function calculateCRC32(data) {
-            if (typeof pako !== 'undefined' && pako.crc32) {
-                return pako.crc32(data).toString(36).padStart(5, '0').slice(-5).toLowerCase();
-            }
-            
-            const table = new Uint32Array(256);
-            for (let i = 0; i < 256; i++) {
-                let c = i;
-                for (let j = 0; j < 8; j++) {
-                    c = (c & 1) ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+            return (PROTO.calculateCRC32 || function(d) {
+                if (typeof pako !== 'undefined' && pako.crc32) {
+                    return pako.crc32(d).toString(36).padStart(5, '0').slice(-5).toLowerCase();
                 }
-                table[i] = c;
-            }
-            
-            let crc = 0xFFFFFFFF;
-            for (let i = 0; i < data.length; i++) {
-                crc = (crc >>> 8) ^ table[(crc ^ data.charCodeAt(i)) & 0xFF];
-            }
-            crc = (crc ^ 0xFFFFFFFF) >>> 0;
-            return crc.toString(36).padStart(5, '0').slice(-5).toLowerCase();
+                const table = new Uint32Array(256);
+                for (let i = 0; i < 256; i++) {
+                    let c = i;
+                    for (let j = 0; j < 8; j++) {
+                        c = (c & 1) ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+                    }
+                    table[i] = c;
+                }
+                let crc = 0xFFFFFFFF;
+                for (let i = 0; i < d.length; i++) {
+                    crc = (crc >>> 8) ^ table[(crc ^ d.charCodeAt(i)) & 0xFF];
+                }
+                crc = (crc ^ 0xFFFFFFFF) >>> 0;
+                return crc.toString(36).padStart(5, '0').slice(-5).toLowerCase();
+            })(data);
         }
 
         function encodeFileName(filename) {
-            try {
-                const encoder = new TextEncoder();
-                const encoded = encoder.encode(filename);
-                return btoa(String.fromCharCode(...encoded));
-            } catch (e) {
-                return btoa(unescape(encodeURIComponent(filename)));
-            }
+            return (PROTO.encodeFileName || function(fn) {
+                try {
+                    const encoder = new TextEncoder();
+                    const encoded = encoder.encode(fn);
+                    return btoa(String.fromCharCode(...encoded));
+                } catch (e) {
+                    return btoa(unescape(encodeURIComponent(fn)));
+                }
+            })(filename);
         }
 
         function uint8ArrayToBase64(uint8Array) {
-            const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
-            let result = '';
-            for (let i = 0; i < uint8Array.length; i += 3) {
-                const byte1 = uint8Array[i];
-                const byte2 = i + 1 < uint8Array.length ? uint8Array[i + 1] : 0;
-                const byte3 = i + 2 < uint8Array.length ? uint8Array[i + 2] : 0;
-                const triplet = (byte1 << 16) | (byte2 << 8) | byte3;
-                result += base64Chars.charAt((triplet >> 18) & 63);
-                result += base64Chars.charAt((triplet >> 12) & 63);
-                result += (i + 1 < uint8Array.length) ? base64Chars.charAt((triplet >> 6) & 63) : '=';
-                result += (i + 2 < uint8Array.length) ? base64Chars.charAt(triplet & 63) : '=';
-            }
-            return result;
+            return (PROTO.uint8ArrayToBase64 || function(arr) {
+                const base64Chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/';
+                let result = '';
+                for (let i = 0; i < arr.length; i += 3) {
+                    const byte1 = arr[i];
+                    const byte2 = i + 1 < arr.length ? arr[i + 1] : 0;
+                    const byte3 = i + 2 < arr.length ? arr[i + 2] : 0;
+                    const triplet = (byte1 << 16) | (byte2 << 8) | byte3;
+                    result += base64Chars.charAt((triplet >> 18) & 63);
+                    result += base64Chars.charAt((triplet >> 12) & 63);
+                    result += (i + 1 < arr.length) ? base64Chars.charAt((triplet >> 6) & 63) : '=';
+                    result += (i + 2 < arr.length) ? base64Chars.charAt(triplet & 63) : '=';
+                }
+                return result;
+            })(uint8Array);
         }
 
         function formatFileSize(bytes) {
@@ -1259,6 +1310,14 @@
             document.getElementById('estimatedChunks').textContent = (estimated + 1) + ' 个';
             const percentage = Math.min(estimated / 100 * 100, 100);
             document.getElementById('estimationBar').style.width = percentage + '%';
+
+            const sizeWarning = document.getElementById('sizeWarning');
+            if (estimated > CONFIG.LARGE_FILE_THRESHOLD) {
+                document.getElementById('warnChunkCount').textContent = estimated + 1;
+                sizeWarning.classList.add('show');
+            } else {
+                sizeWarning.classList.remove('show');
+            }
         }
 
         // 生成二维码
@@ -1360,7 +1419,7 @@
         function createFileNameQrCode(totalChunks) {
             const encodedFileName = encodeFileName(originalFileName);
             const fileNameData = {
-                t: CONFIG.PACKET_TYPES.FILENAME,
+                t: PACKET_TYPES.FILENAME,
                 f: fileFingerprint,
                 n: encodedFileName,
                 s: originalFileSize,
@@ -1392,14 +1451,14 @@
             for (let i = 0; i < chunks.length; i++) {
                 qrCodes.push({
                     data: chunks[i],
-                    type: CONFIG.PACKET_TYPES.DATA,
+                    type: PACKET_TYPES.DATA,
                     index: i
                 });
             }
             
             qrCodes.push({
                 data: fileNameQrCode,
-                type: CONFIG.PACKET_TYPES.FILENAME,
+                type: PACKET_TYPES.FILENAME,
                 index: chunks.length
             });
             
@@ -1447,19 +1506,25 @@
         function showQRCode(index) {
             currentChunkIndex = index;
             const qrData = qrCodes[index];
-            
+
             qrContainer.innerHTML = '<div id="qrcode"></div>';
-            
-            const isFilenameQR = qrData.type === CONFIG.PACKET_TYPES.FILENAME;
-            
+
+            const isFilenameQR = qrData.type === PACKET_TYPES.FILENAME;
+            const isColor = CONFIG.COLOR_SCHEME === 'color';
+
             qrContainer.className = isFilenameQR ? 'qr-container filename-qr' : 'qr-container data-qr';
-            
+
+            const colorDark = isColor
+                ? (isFilenameQR ? '#ff9f1c' : '#00d4ff')
+                : '#000000';
+            const colorLight = isColor ? '#000000' : '#ffffff';
+
             new QRCode(document.getElementById('qrcode'), {
                 text: JSON.stringify(qrData.data),
                 width: CONFIG.QR_SIZE,
                 height: CONFIG.QR_SIZE,
-                colorDark: isFilenameQR ? '#ff9f1c' : '#00d4ff',
-                colorLight: '#000000',
+                colorDark: colorDark,
+                colorLight: colorLight,
                 correctLevel: QRCode.CorrectLevel.L
             });
             
@@ -1542,7 +1607,7 @@
             try {
                 for (let i = 0; i < qrCodes.length; i++) {
                     const qr = qrCodes[i];
-                    const isFilename = qr.type === CONFIG.PACKET_TYPES.FILENAME;
+                    const isFilename = qr.type === PACKET_TYPES.FILENAME;
                     
                     const tempDiv = document.createElement('div');
                     tempDiv.style.position = 'absolute';
@@ -1550,12 +1615,13 @@
                     tempDiv.style.top = '-9999px';
                     document.body.appendChild(tempDiv);
                     
+                    const isColor = CONFIG.COLOR_SCHEME === 'color';
                     new QRCode(tempDiv, {
                         text: JSON.stringify(qr.data),
                         width: CONFIG.QR_SIZE,
                         height: CONFIG.QR_SIZE,
-                        colorDark: isFilename ? '#ff9f1c' : '#00d4ff',
-                        colorLight: '#000000',
+                        colorDark: isColor ? (isFilename ? '#ff9f1c' : '#00d4ff') : '#000000',
+                        colorLight: isColor ? '#000000' : '#ffffff',
                         correctLevel: QRCode.CorrectLevel.L
                     });
                     
@@ -1614,6 +1680,19 @@
                 startAutoplay();
             } else {
                 stopAutoplay();
+            }
+        });
+
+        // 颜色方案切换
+        const colorSchemeCheckbox = document.getElementById('colorSchemeCheckbox');
+        const colorSchemeStatus = document.getElementById('colorSchemeStatus');
+
+        colorSchemeCheckbox.addEventListener('change', () => {
+            CONFIG.COLOR_SCHEME = colorSchemeCheckbox.checked ? 'color' : 'bw';
+            colorSchemeStatus.textContent = colorSchemeCheckbox.checked ? '彩色' : '标准黑白';
+            if (hasGenerated) {
+                showQRCode(currentChunkIndex);
+                showToast('颜色方案已更新');
             }
         });
 
@@ -1680,10 +1759,15 @@
             CONFIG.QR_SIZE = 400;
             
             hideRegenerateHints();
-            
+
             document.getElementById('estimatedChunks').textContent = '-- 个';
             document.getElementById('estimationBar').style.width = '0%';
-            
+            document.getElementById('sizeWarning').classList.remove('show');
+
+            colorSchemeCheckbox.checked = true;
+            colorSchemeStatus.textContent = '彩色';
+            CONFIG.COLOR_SCHEME = 'color';
+
             showStatus('请选择一个文件开始', 'info');
             showToast('已重置');
         });
