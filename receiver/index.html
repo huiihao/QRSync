@@ -5,875 +5,59 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <title>QRSync - 接收端</title>
-    <!-- 本地依赖库 -->
-    <script src="../js/zxing-library.min.js"></script>
-    <script src="../js/pako.min.js"></script>
-    <script src="../js/localforage.min.js"></script>
-    <script src="../js/jsQR.js"></script>
-    <script src="../js/protocol.js"></script>
-    <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            -webkit-tap-highlight-color: transparent;
-        }
-        
-        :root {
-            --bg-primary: #0a0a0f;
-            --bg-secondary: #12121a;
-            --bg-card: rgba(30, 30, 45, 0.6);
-            --border-glass: rgba(255, 255, 255, 0.08);
-            --text-primary: #ffffff;
-            --text-secondary: rgba(255, 255, 255, 0.6);
-            --accent: #00d4ff;
-            --accent-secondary: #7b2cbf;
-            --success: #00f5d4;
-            --warning: #ff9f1c;
-            --error: #ef476f;
-            --glass-blur: blur(20px);
-        }
-        
-        body {
-            font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", Roboto, sans-serif;
-            background: var(--bg-primary);
-            min-height: 100vh;
-            color: var(--text-primary);
-            line-height: 1.6;
-            -webkit-font-smoothing: antialiased;
-        }
-        
-        /* Animated background gradient */
-        body::before {
-            content: '';
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: 
-                radial-gradient(ellipse at 20% 20%, rgba(0, 212, 255, 0.15) 0%, transparent 50%),
-                radial-gradient(ellipse at 80% 80%, rgba(123, 44, 191, 0.15) 0%, transparent 50%),
-                radial-gradient(ellipse at 50% 50%, rgba(0, 245, 212, 0.05) 0%, transparent 70%);
-            pointer-events: none;
-            z-index: -1;
-        }
-        
-        /* Navigation - Glassmorphism */
-        nav {
-            position: fixed;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 64px;
-            background: rgba(18, 18, 26, 0.8);
-            backdrop-filter: var(--glass-blur);
-            -webkit-backdrop-filter: var(--glass-blur);
-            border-bottom: 1px solid var(--border-glass);
-            z-index: 1000;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .nav-content {
-            width: 100%;
-            max-width: 1200px;
-            padding: 0 24px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-        
-        .logo {
-            font-size: 22px;
-            font-weight: 700;
-            text-decoration: none;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        
-        .logo-icon {
-            width: 36px;
-            height: 36px;
-            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
-            border-radius: 10px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 18px;
-        }
-        
-        .nav-links a {
-            color: var(--text-secondary);
-            text-decoration: none;
-            font-size: 14px;
-            font-weight: 500;
-            padding: 8px 16px;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-            border: 1px solid transparent;
-        }
-        
-        .nav-links a:hover {
-            color: var(--accent);
-            background: rgba(0, 212, 255, 0.1);
-            border-color: rgba(0, 212, 255, 0.2);
-        }
-        
-        .container {
-            max-width: 900px;
-            margin: 0 auto;
-            padding: 100px 20px 40px;
-        }
-        
-        h1 {
-            font-size: 42px;
-            font-weight: 700;
-            text-align: center;
-            margin-bottom: 40px;
-            background: linear-gradient(135deg, var(--text-primary), var(--accent));
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-        }
-        
-        @media (max-width: 734px) {
-            h1 { font-size: 28px; }
-            .container { padding-top: 80px; }
-        }
-        
-        /* Mode Switcher */
-        .mode-switcher {
-            display: flex;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 16px;
-            padding: 4px;
-            margin-bottom: 30px;
-            width: fit-content;
-            margin-left: auto;
-            margin-right: auto;
-            border: 1px solid var(--border-glass);
-        }
-        
-        .mode-btn {
-            padding: 12px 24px;
-            border: none;
-            background: transparent;
-            color: var(--text-secondary);
-            font-size: 15px;
-            font-weight: 500;
-            cursor: pointer;
-            border-radius: 12px;
-            transition: all 0.3s;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-        
-        .mode-btn.active {
-            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
-            color: white;
-            box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
-        }
-        
-        @media (max-width: 734px) {
-            .mode-btn { padding: 10px 16px; font-size: 14px; }
-        }
-        
-        /* Scanner Container - Glassmorphism */
-        .scanner-container {
-            background: var(--bg-card);
-            backdrop-filter: var(--glass-blur);
-            -webkit-backdrop-filter: var(--glass-blur);
-            border: 1px solid var(--border-glass);
-            border-radius: 24px;
-            padding: 40px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .scanner-container::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-        }
-        
-        @media (max-width: 734px) {
-            .scanner-container { padding: 24px; border-radius: 20px; }
-        }
-        
-        #camera-section, #virtual-section {
-            display: none;
-        }
-        
-        #camera-section.active, #virtual-section.active {
-            display: block;
-        }
-        
-        .camera-controls {
-            margin-bottom: 20px;
-        }
-        
-        .camera-select-row {
-            display: flex;
-            gap: 12px;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-        }
-        
-        #camera-select {
-            flex: 1;
-            min-width: 200px;
-            padding: 14px;
-            border: 1px solid var(--border-glass);
-            border-radius: 12px;
-            font-size: 15px;
-            background: rgba(0, 0, 0, 0.3);
-            appearance: none;
-            -webkit-appearance: none;
-            background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%2300d4ff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-            background-repeat: no-repeat;
-            background-position: right 14px center;
-            padding-right: 40px;
-            color: var(--text-primary);
-        }
-        
-        .scan-section-wrapper {
-            position: relative;
-            margin-bottom: 20px;
-            border-radius: 20px;
-            overflow: hidden;
-            display: none;
-            border: 2px solid var(--border-glass);
-        }
-        
-        .scan-section-wrapper.active {
-            display: block;
-        }
-        
-        .scan-window {
-            width: 100%;
-            background: #000;
-            position: relative;
-            padding-top: 100%;
-            border-radius: 20px;
-            overflow: hidden;
-        }
-        
-        .video-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            overflow: hidden;
-            background: #000;
-        }
-        
-        #video {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        .scan-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            z-index: 2;
-        }
-        
-        .scan-frame {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            width: 70%;
-            height: 70%;
-            border: 3px solid var(--accent);
-            border-radius: 20px;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6);
-            animation: scan-pulse 2s infinite;
-        }
-        
-        @keyframes scan-pulse {
-            0% { border-color: var(--accent); box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 212, 255, 0.3); }
-            50% { border-color: var(--success); box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 245, 212, 0.5); }
-            100% { border-color: var(--accent); box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6), 0 0 20px rgba(0, 212, 255, 0.3); }
-        }
-        
-        .scan-success .scan-frame {
-            border-color: var(--success) !important;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.6), 0 0 30px rgba(0, 245, 212, 0.6) !important;
-            animation: none !important;
-        }
-        
-        .corner {
-            position: absolute;
-            width: 24px;
-            height: 24px;
-            border-color: var(--accent);
-            border-style: solid;
-        }
-        
-        .corner.tl { top: -3px; left: -3px; border-width: 4px 0 0 4px; }
-        .corner.tr { top: -3px; right: -3px; border-width: 4px 4px 0 0; }
-        .corner.bl { bottom: -3px; left: -3px; border-width: 0 0 4px 4px; }
-        .corner.br { bottom: -3px; right: -3px; border-width: 0 4px 4px 0; }
-        
-        .scan-close-btn {
-            position: absolute;
-            top: 15px;
-            right: 15px;
-            width: 40px;
-            height: 40px;
-            background: rgba(239, 71, 111, 0.9);
-            border: 2px solid white;
-            border-radius: 50%;
-            color: white;
-            font-size: 24px;
-            cursor: pointer;
-            z-index: 100;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.3s;
-            pointer-events: auto;
-        }
-        
-        .scan-close-btn:hover {
-            background: rgba(192, 57, 43, 0.9);
-            transform: scale(1.1);
-        }
-        
-        .scan-tips {
-            background: linear-gradient(135deg, rgba(0, 212, 255, 0.9), rgba(123, 44, 191, 0.9));
-            color: white;
-            text-align: center;
-            padding: 12px;
-            border-radius: 0 0 20px 20px;
-            font-size: 14px;
-            margin-top: -20px;
-            position: relative;
-            z-index: 10;
-        }
-        
-        .scan-tips p { margin: 3px 0; }
-        
-        /* Floating Message */
-        .floating-message {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            background: rgba(0, 245, 212, 0.95);
-            color: #000;
-            padding: 20px 30px;
-            border-radius: 16px;
-            font-size: 18px;
-            font-weight: 600;
-            z-index: 2000;
-            box-shadow: 0 10px 30px rgba(0, 245, 212, 0.4);
-            animation: floatUp 1.5s ease forwards;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            max-width: 80%;
-            text-align: center;
-            backdrop-filter: blur(10px);
-            pointer-events: none;
-        }
-        
-        .floating-error {
-            background: rgba(239, 71, 111, 0.95);
-            color: white;
-            box-shadow: 0 10px 30px rgba(239, 71, 111, 0.4);
-        }
-        
-        @keyframes floatUp {
-            0% { opacity: 0; transform: translate(-50%, -30%); }
-            20% { opacity: 1; transform: translate(-50%, -50%); }
-            80% { opacity: 1; transform: translate(-50%, -50%); }
-            100% { opacity: 0; transform: translate(-50%, -70%); }
-        }
-        
-        /* Upload Zone */
-        .upload-zone {
-            border: 2px dashed rgba(0, 212, 255, 0.3);
-            border-radius: 16px;
-            padding: 40px;
-            text-align: center;
-            background: rgba(0, 212, 255, 0.03);
-            transition: all 0.3s;
-            cursor: pointer;
-            margin-bottom: 20px;
-        }
-        
-        .upload-zone:hover, .upload-zone.dragover {
-            border-color: var(--accent);
-            background: rgba(0, 212, 255, 0.08);
-        }
-        
-        .upload-zone h3 { font-size: 20px; font-weight: 600; margin-bottom: 8px; color: var(--text-primary); }
-        .upload-zone p { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
-        
-        .paste-tip {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            padding: 8px 16px;
-            background: rgba(0, 0, 0, 0.3);
-            border-radius: 8px;
-            font-size: 13px;
-            color: var(--text-secondary);
-            border: 1px solid var(--border-glass);
-        }
-        
-        kbd {
-            padding: 2px 6px;
-            background: rgba(0, 212, 255, 0.2);
-            border-radius: 4px;
-            font-family: monospace;
-            font-size: 12px;
-            color: var(--accent);
-        }
-        
-        /* Preview Section */
-        .preview-section { display: none; margin-bottom: 24px; }
-        .preview-section.active { display: block; }
-        
-        .image-preview-container {
-            width: 100%;
-            background: #000;
-            border-radius: 16px;
-            overflow: hidden;
-            position: relative;
-            margin-bottom: 20px;
-            border: 2px solid var(--border-glass);
-        }
-        
-        #preview-canvas {
-            display: block;
-            width: 100%;
-            height: 100%;
-            object-fit: contain;
-        }
-        
-        .image-scan-overlay {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-        }
-        
-        .image-scan-frame {
-            width: 100%;
-            height: 100%;
-            border: 3px solid var(--accent);
-            border-radius: 20px;
-            position: relative;
-            box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.5);
-        }
-        
-        /* Queue Section */
-        .queue-section { margin-bottom: 24px; }
-        
-        .queue-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-        
-        .queue-list {
-            display: flex;
-            gap: 12px;
-            overflow-x: auto;
-            padding: 4px;
-            margin-bottom: 16px;
-            -webkit-overflow-scrolling: touch;
-        }
-        
-        .queue-item {
-            flex-shrink: 0;
-            width: 80px;
-            height: 80px;
-            border-radius: 12px;
-            overflow: hidden;
-            position: relative;
-            border: 3px solid transparent;
-            background: rgba(0, 0, 0, 0.3);
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-        
-        .queue-item img {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-        }
-        
-        .queue-item.pending { border-color: var(--accent); }
-        .queue-item.completed { border-color: var(--success); opacity: 0.7; }
-        .queue-item.error { border-color: var(--error); }
-        .queue-item.active { box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.3); }
-        
-        .queue-badge {
-            position: absolute;
-            top: 4px;
-            right: 4px;
-            background: var(--accent);
-            color: #000;
-            width: 22px;
-            height: 22px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 11px;
-            font-weight: 700;
-        }
-        
-        .queue-item.completed .queue-badge { background: var(--success); }
-        
-        /* Buttons */
-        .btn {
-            padding: 14px 28px;
-            border-radius: 12px;
-            font-size: 16px;
-            font-weight: 500;
-            border: none;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            touch-action: manipulation;
-            -webkit-touch-callout: none;
-            background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
-            color: white;
-            width: 100%;
-            position: relative;
-            overflow: hidden;
-        }
-        
-        .btn::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: -100%;
-            width: 100%;
-            height: 100%;
-            background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
-            transition: left 0.5s;
-        }
-        
-        .btn:hover::before {
-            left: 100%;
-        }
-        
-        .btn:disabled { 
-            opacity: 0.5; 
-            cursor: not-allowed; 
-        }
-        
-        .btn-secondary { 
-            background: rgba(255, 255, 255, 0.08);
-            color: var(--text-primary);
-            border: 1px solid var(--border-glass);
-        }
-        
-        .btn-secondary:hover:not(:disabled) {
-            background: rgba(255, 255, 255, 0.12);
-            border-color: rgba(0, 212, 255, 0.3);
-        }
-        
-        .btn-success { 
-            background: linear-gradient(135deg, var(--success), #00c9a7);
-            color: #000;
-            font-weight: 600;
-        }
-        
-        .btn-danger { 
-            background: linear-gradient(135deg, var(--error), #d63030);
-            color: white;
-        }
-        
-        .btn-danger:hover:not(:disabled) { 
-            background: linear-gradient(135deg, #d63030, #c0392b);
-        }
-        
-        @media (max-width: 734px) {
-            .btn { padding: 16px; font-size: 15px; }
-        }
-        
-        .action-buttons {
-            display: flex;
-            gap: 12px;
-            flex-wrap: wrap;
-        }
-        
-        .action-buttons .btn { flex: 1; min-width: 140px; }
-        
-        /* Danger Zone */
-        .danger-zone {
-            margin-top: 30px;
-            padding: 20px;
-            border: 1px solid rgba(239, 71, 111, 0.3);
-            border-radius: 16px;
-            background: rgba(239, 71, 111, 0.05);
-        }
-        
-        .danger-zone-title {
-            font-size: 14px;
-            color: var(--error);
-            margin-bottom: 12px;
-            font-weight: 600;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-        
-        .danger-zone .btn {
-            background: rgba(239, 71, 111, 0.15);
-            color: var(--error);
-            border: 1px solid rgba(239, 71, 111, 0.3);
-        }
-        
-        .danger-zone .btn:hover:not(:disabled) {
-            background: var(--error);
-            color: white;
-        }
-        
-        /* Status Bar */
-        .status-bar {
-            background: rgba(0, 0, 0, 0.2);
-            border-radius: 16px;
-            padding: 20px;
-            margin-top: 30px;
-            border: 1px solid var(--border-glass);
-        }
-        
-        .status-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-            flex-wrap: wrap;
-            gap: 8px;
-        }
-        
-        .fingerprint-display {
-            padding: 12px;
-            background: rgba(0, 212, 255, 0.1);
-            border-radius: 12px;
-            margin-bottom: 12px;
-            font-family: 'Courier New', monospace;
-            font-size: 13px;
-            text-align: center;
-            border: 1px solid rgba(0, 212, 255, 0.2);
-            color: var(--accent);
-            word-break: break-all;
-        }
-        
-        .progress-bar {
-            width: 100%;
-            height: 8px;
-            background: rgba(255, 255, 255, 0.08);
-            border-radius: 4px;
-            overflow: hidden;
-            margin-bottom: 12px;
-        }
-        
-        .progress-fill {
-            height: 100%;
-            background: linear-gradient(90deg, var(--accent), var(--success));
-            width: 0%;
-            transition: width 0.3s ease;
-            box-shadow: 0 0 10px rgba(0, 212, 255, 0.3);
-        }
-        
-        .chunks-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(36px, 1fr));
-            gap: 6px;
-            max-height: 120px;
-            overflow-y: auto;
-        }
-        
-        .chunk-cell {
-            aspect-ratio: 1;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            background: rgba(255, 255, 255, 0.05);
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
-            color: var(--text-secondary);
-            transition: all 0.3s;
-            border: 1px solid var(--border-glass);
-        }
-        
-        .chunk-cell.filled {
-            background: linear-gradient(135deg, var(--success), #00c9a7);
-            color: #000;
-            animation: chunk-pop 0.3s ease;
-            border-color: transparent;
-        }
-        
-        .chunk-cell.filename {
-            background: linear-gradient(135deg, var(--warning), #ff6b35);
-            color: white;
-            border-color: transparent;
-        }
-
-        .chunk-cell.crc-fail {
-            background: rgba(239, 71, 111, 0.7);
-            color: white;
-            border-color: var(--error);
-            animation: chunk-pop 0.3s ease;
-        }
-        
-        @keyframes chunk-pop {
-            0% { transform: scale(0.8); }
-            70% { transform: scale(1.1); }
-            100% { transform: scale(1); }
-        }
-        
-        /* Toast */
-        .toast {
-            position: fixed;
-            bottom: 30px;
-            left: 50%;
-            transform: translateX(-50%) translateY(100px);
-            background: rgba(18, 18, 26, 0.95);
-            color: white;
-            padding: 14px 28px;
-            border-radius: 16px;
-            font-size: 14px;
-            opacity: 0;
-            transition: all 0.3s;
-            z-index: 2000;
-            backdrop-filter: blur(10px);
-            text-align: center;
-            max-width: 90%;
-            border: 1px solid var(--border-glass);
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-        }
-        
-        .toast.show {
-            transform: translateX(-50%) translateY(0);
-            opacity: 1;
-        }
-        
-        .hidden-file-input { display: none; }
-        
-        .status-message {
-            padding: 14px;
-            border-radius: 12px;
-            margin-bottom: 16px;
-            text-align: center;
-            font-size: 14px;
-            display: none;
-            border: 1px solid transparent;
-        }
-        
-        .status-message.show { display: block; }
-        
-        .status-success { 
-            background: rgba(0, 245, 212, 0.1);
-            color: var(--success);
-            border-color: rgba(0, 245, 212, 0.3);
-        }
-        
-        .status-error { 
-            background: rgba(239, 71, 111, 0.1);
-            color: var(--error);
-            border-color: rgba(239, 71, 111, 0.3);
-        }
-        
-        .status-info { 
-            background: rgba(0, 212, 255, 0.1);
-            color: var(--accent);
-            border-color: rgba(0, 212, 255, 0.3);
-        }
-        
-        @media (max-width: 480px) {
-            .chunk-item {
-                width: 30px;
-                height: 30px;
-                font-size: 12px;
-            }
-        }
-        
-        @media (min-width: 768px) {
-            .app-container {
-                max-width: 500px;
-                margin: 0 auto;
-            }
-        }
-    </style>
+    <link rel="stylesheet" href="../shared/theme.css">
+    <link rel="stylesheet" href="receiver.css">
 </head>
 <body>
     <nav>
         <div class="nav-content">
             <a href="../index.html" class="logo">
                 <div class="logo-icon">
-                  <img src="../icon/QRSync_icon.png" alt="Logo" width="100%" height="100%">
+                    <img src="../icon/QRSync_icon.png" alt="Logo" width="100%" height="100%">
                 </div>
                 QRSync
             </a>
             <div class="nav-links">
-                <a href="../sender/index.html">发送端➡️</a>
+                <a href="../sender/index.html">⬅️ 发送端</a>
             </div>
         </div>
     </nav>
-    
+
     <div class="container">
-        <h1>接收文件</h1>
-        
-        <div class="mode-switcher">
-            <button class="mode-btn active" onclick="switchMode('camera')">📷 相机扫描</button>
-            <button class="mode-btn" onclick="switchMode('virtual')">🖼️ 图片识别</button>
+        <div class="page-header">
+            <h1>接收文件</h1>
+            <p>扫描二维码序列，自动重组文件</p>
         </div>
-        
-        <div class="scanner-container">
-            <!-- Camera Section -->
+
+        <!-- 扫描区域 -->
+        <div class="card scanner-container">
+            <div class="card-title"><div class="icon">📷</div>扫描二维码</div>
+
+            <!-- 模式切换 -->
+            <div class="mode-tabs">
+                <button class="mode-btn active" data-mode="camera" onclick="switchMode('camera')">📷 相机扫描</button>
+                <button class="mode-btn" data-mode="virtual" onclick="switchMode('virtual')">🖼️ 图片识别</button>
+            </div>
+
+            <!-- 相机模式 -->
             <div id="camera-section" class="active">
                 <div class="camera-controls">
                     <div class="camera-select-row">
-                        <select id="camera-select">
-                            <option value="">请选择摄像头...</option>
+                        <select id="camera-select"><option value="">请选择摄像头...</option></select>
+                        <select id="resolution-select">
+                            <option value="auto">自动</option>
+                            <option value="720">720p (HD)</option>
+                            <option value="1080">1080p (FHD)</option>
+                            <option value="1440">2K (QHD)</option>
+                            <option value="2160">4K (UHD)</option>
                         </select>
                     </div>
-                    
-                    <button id="btn-start" class="btn" onclick="toggleCamera()">
+                    <div class="resolution-actual" id="resolution-actual"></div>
+                    <button id="btn-start" class="btn btn-primary" style="width:100%" onclick="toggleCamera()">
                         <span id="scan-btn-text">🚀 开始扫描</span>
                     </button>
                 </div>
-                
+
                 <div id="scan-section-wrapper" class="scan-section-wrapper">
                     <div class="scan-window" id="scan-window">
                         <button class="scan-close-btn" onclick="stopCamera()">×</button>
@@ -885,6 +69,7 @@
                                     <div class="corner tr"></div>
                                     <div class="corner bl"></div>
                                     <div class="corner br"></div>
+                                    <div class="scan-line"></div>
                                 </div>
                             </div>
                         </div>
@@ -894,890 +79,129 @@
                         <p>先扫描数据二维码，最后扫描文件名二维码</p>
                     </div>
                 </div>
-                
-                <div id="camera-status" class="status-message status-info show">
-                    等待扫描第一个二维码...
-                </div>
+
+                <div id="camera-status" class="status-message show status-info">等待扫描第一个二维码...</div>
             </div>
-            
-            <!-- Virtual Section -->
+
+            <!-- 虚拟模式 -->
             <div id="virtual-section">
-                <div class="upload-zone" onclick="document.getElementById('file-input').click()" 
-                     ondrop="handleDrop(event)" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)">
-                    <h3>📁 添加图片到队列</h3>
-                    <p>支持拖拽、粘贴或点击选择多张图片</p>
-                    <div class="paste-tip">
-                        <kbd id="kbd-cmd">Ctrl</kbd> + <kbd>V</kbd> 粘贴
-                    </div>
+                <div class="upload-zone"
+                     onclick="document.getElementById('file-input').click()"
+                     ondrop="handleDrop(event)"
+                     ondragover="handleDragOver(event)"
+                     ondragleave="handleDragLeave(event)">
+                    <h3>📁 点击或拖拽图片到此处</h3>
+                    <p style="font-size:13px;color:var(--text-secondary);margin-top:8px">
+                        也可直接 <kbd class="kbd-cmd">⌘</kbd>+V 粘贴
+                    </p>
                 </div>
-                
-                <input type="file" id="file-input" class="hidden-file-input" accept="image/*" multiple onchange="handleFileSelect(event)">
-                
-                <div class="queue-section" id="queue-section" style="display: none;">
-                    <div class="queue-header">
-                        <span style="font-weight: 600;">处理队列</span>
-                        <span style="font-size: 14px; color: var(--text-secondary);">
-                            <span id="queue-completed">0</span>/<span id="queue-total">0</span> 完成
-                        </span>
-                    </div>
-                    <div class="queue-list" id="queue-list"></div>
-                    
-                    <div class="action-buttons" style="margin-bottom: 20px;">
-                        <button class="btn btn-secondary" onclick="clearQueue()" style="flex: 0.5;">清空队列</button>
-                        <button class="btn" onclick="processQueue()" id="btn-process">▶ 开始处理</button>
-                    </div>
+                <input type="file" id="file-input" accept="image/*" multiple style="display:none"
+                       onchange="addToQueue([...this.files])">
+
+                <div class="queue-grid" id="queue-grid"></div>
+
+                <div id="preview-container" class="preview-container" style="display:none">
+                    <canvas id="preview-canvas"></canvas>
                 </div>
-                
-                <div class="preview-section" id="preview-section">
-                    <div class="image-preview-container" id="preview-container">
-                        <canvas id="preview-canvas"></canvas>
-                        <div class="image-scan-overlay">
-                            <div class="image-scan-frame">
-                                <div class="corner tl"></div>
-                                <div class="corner tr"></div>
-                                <div class="corner bl"></div>
-                                <div class="corner br"></div>
-                            </div>
-                        </div>
-                    </div>
-                    
-                    <div class="action-buttons">
-                        <button class="btn" onclick="scanCurrent()" id="btn-scan">🔍 识别扫描框区域</button>
-                        <button class="btn btn-secondary" onclick="nextImage()">⏭️ 下一张</button>
-                    </div>
-                    
-                    <div style="text-align: center; margin-top: 12px; font-size: 14px; color: var(--text-secondary);">
-                        <span id="current-status">等待识别</span> | 
-                        <span id="current-file">--</span>
-                    </div>
+
+                <div class="btn-group" style="margin-top:12px">
+                    <button class="btn btn-primary" id="btn-scan" onclick="scanCurrent()">🔍 识别</button>
+                    <button class="btn btn-secondary" onclick="scanAllQueued()">⚡ 全部识别</button>
                 </div>
             </div>
-            
-            <!-- Status -->
-            <div class="status-bar">
-                <div class="status-header">
-                    <span style="font-weight: 600;" id="status-text">准备就绪</span>
-                    <span id="progress-text">0%</span>
+        </div>
+
+        <!-- 接收进度 -->
+        <div class="card">
+            <div class="card-title"><div class="icon">📊</div>接收进度</div>
+
+            <div class="progress-stats">
+                <div class="stat-item">
+                    <div class="stat-value" id="received-count">0</div>
+                    <div class="stat-label">已接收</div>
                 </div>
-                
-                <div id="fingerprint-display" class="fingerprint-display" style="display: none;">
-                    <strong>文件指纹:</strong> <span id="fingerprint-value">未设置</span>
+                <div class="stat-item">
+                    <div class="stat-value" id="total-count">?</div>
+                    <div class="stat-label">总分片</div>
                 </div>
-                
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progress-fill"></div>
+                <div class="stat-item">
+                    <div class="stat-value" id="missing-count">?</div>
+                    <div class="stat-label">缺失</div>
                 </div>
-                <div class="chunks-grid" id="chunks-grid"></div>
+                <div class="stat-item">
+                    <div class="stat-value" id="progress-pct">--</div>
+                    <div class="stat-label">完成率</div>
+                </div>
             </div>
-            
-            <div class="action-buttons" style="margin-top: 24px;">
-                <button class="btn btn-secondary" onclick="loadProgress()">🔄 恢复数据</button>
-                <button class="btn btn-success" onclick="reassembleFile()" id="btn-reassemble" disabled>🧩 重组</button>
-                <button class="btn btn-success" onclick="downloadFile()" id="btn-download" disabled>⬇️ 下载</button>
+
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill-recv" style="width:0%"></div>
             </div>
-            
-            <!-- 清除数据区域 -->
-            <div class="danger-zone">
-                <div class="danger-zone-title">⚠️ 危险区域</div>
-                <button class="btn btn-danger" onclick="clearAllData()">
-                    <span>🗑️ 清除所有数据</span>
+
+            <div id="fingerprint-display" class="fingerprint-display" style="display:none">
+                <div class="fp-label">文件指纹</div>
+                <div class="fp-value" id="fingerprint-value">-</div>
+            </div>
+
+            <div id="filename-display" style="display:none;margin-top:12px;font-size:14px;color:var(--text-secondary);text-align:center">
+                文件名：<span style="color:var(--text-primary);font-weight:500"></span>
+            </div>
+
+            <div class="missing-chunks" id="missing-list"></div>
+        </div>
+
+        <!-- 操作 -->
+        <div class="card">
+            <div class="card-title"><div class="icon">⬇️</div>下载文件</div>
+            <div class="action-buttons">
+                <button class="btn btn-success" id="btn-reassemble" disabled onclick="reassembleFile()">
+                    ⬇️ 重组并下载
                 </button>
-                <p style="font-size: 13px; color: var(--text-secondary); margin-top: 10px; text-align: center;">
-                    这将清除所有已接收的分片、文件指纹和保存的进度
-                </p>
+                <button class="btn btn-secondary" onclick="clearAllData()">
+                    🗑️ 清除数据
+                </button>
             </div>
         </div>
     </div>
-    
+
     <div class="toast" id="toast"></div>
 
+    <!-- 依赖库（顺序重要） -->
+    <script src="../js/pako.min.js"></script>
+    <script src="../js/localforage.min.js"></script>
+    <script src="../js/jsQR.js"></script>
+
+    <!-- zxing-wasm：wasm binary 以 base64 内嵌，绕过 file:// CORS 限制 -->
+    <script src="../js/zxing_reader_wasm_b64.js"></script>
     <script>
-        // ==================== Global State ====================
-        const PROTO = window.QRPROTO || {};
-        const PACKET_TYPES = (PROTO && PROTO.PACKET_TYPES) ? PROTO.PACKET_TYPES : { DATA: 'data', FILENAME: 'fn' };
-
-        let codeReader = null;
-        let scanControls = null;
-        let isScanning = false;
-        let currentMode = 'camera';
-
-        let receivedChunks = new Map();
-        let failedChunks = new Set();
-        let fileInfo = null;
-        let currentFileFingerprint = null;
-        let receivedFileName = '';
-
-        let lastDecodedText = '';
-        let lastScanTime = 0;
-
-        let imageQueue = [];
-        let currentImageIndex = -1;
-
-        // ==================== CRC32 (使用共享协议库) ====================
-        function calculateCRC32(data) {
-            return (PROTO.calculateCRC32 || function(d) {
-                if (typeof pako !== 'undefined' && pako.crc32) {
-                    return pako.crc32(d).toString(36).padStart(5, '0').slice(-5).toLowerCase();
-                }
-                const table = new Uint32Array(256);
-                for (let i = 0; i < 256; i++) {
-                    let c = i;
-                    for (let j = 0; j < 8; j++) {
-                        c = (c & 1) ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
-                    }
-                    table[i] = c;
-                }
-                let crc = 0xFFFFFFFF;
-                for (let i = 0; i < d.length; i++) {
-                    crc = (crc >>> 8) ^ table[(crc ^ d.charCodeAt(i)) & 0xFF];
-                }
-                crc = (crc ^ 0xFFFFFFFF) >>> 0;
-                return crc.toString(36).padStart(5, '0').slice(-5).toLowerCase();
-            })(data);
-        }
-
-        // ==================== 文件名解码 (使用共享协议库) ====================
-        function decodeFileName(base64Name) {
-            return (PROTO.decodeFileName || function(bn) {
-                try {
-                    const binaryStr = atob(bn);
-                    const bytes = new Uint8Array(binaryStr.length);
-                    for (let i = 0; i < binaryStr.length; i++) {
-                        bytes[i] = binaryStr.charCodeAt(i);
-                    }
-                    const decoder = new TextDecoder('utf-8');
-                    return decoder.decode(bytes);
-                } catch (e) {
-                    try {
-                        return decodeURIComponent(atob(bn));
-                    } catch (e2) {
-                        return bn;
-                    }
-                }
-            })(base64Name);
-        }
-        
-        // ==================== Init ====================
-        document.addEventListener('DOMContentLoaded', async () => {
-            const isMac = navigator.platform.includes('Mac');
-            document.getElementById('kbd-cmd').textContent = isMac ? '⌘' : 'Ctrl';
-            document.addEventListener('paste', handlePaste);
-            
-            if (typeof ZXing !== 'undefined') {
-                await initCameraList();
-            } else {
-                document.getElementById('camera-select').innerHTML = '<option value="">ZXing 库加载失败</option>';
-                document.getElementById('btn-start').disabled = true;
-                document.getElementById('scan-btn-text').textContent = '❌ 库加载失败';
-            }
-            await loadProgress();
-        });
-        
-        // ==================== 清除所有数据 ====================
-        async function clearAllData() {
-            if (!confirm('⚠️ 确定要清除所有数据吗？\n\n这将永久删除：\n• 所有已接收的数据分片\n• 文件指纹和文件名信息\n• 本地保存的进度\n• 已重组的文件\n\n此操作不可恢复！')) {
-                return;
-            }
-            
-            try {
-                if (isScanning) await stopCamera();
-                
-                receivedChunks.clear();
-                failedChunks.clear();
-                fileInfo = null;
-                currentFileFingerprint = null;
-                receivedFileName = '';
-                imageQueue = [];
-                currentImageIndex = -1;
-
-                const store = localforage.createInstance({ name: 'qrcode-receiver-v2' });
-                await store.clear();
-                try {
-                    const legacyStore = localforage.createInstance({ name: 'qrcode-receiver' });
-                    await legacyStore.clear();
-                } catch (e) { /* ignore */ }
-                
-                document.getElementById('fingerprint-display').style.display = 'none';
-                document.getElementById('fingerprint-value').textContent = '未设置';
-                document.getElementById('progress-fill').style.width = '0%';
-                document.getElementById('progress-text').textContent = '0%';
-                document.getElementById('status-text').textContent = '准备就绪';
-                document.getElementById('chunks-grid').innerHTML = '';
-                document.getElementById('btn-reassemble').disabled = true;
-                document.getElementById('btn-download').disabled = true;
-                document.getElementById('camera-status').textContent = '等待扫描第一个二维码...';
-                document.getElementById('camera-status').className = 'status-message status-info show';
-                
-                document.getElementById('queue-section').style.display = 'none';
-                document.getElementById('preview-section').classList.remove('active');
-                document.getElementById('queue-list').innerHTML = '';
-                
-                showFloatingMessage('✅ 所有数据已清除');
-                showToast('数据清除完成');
-            } catch (err) {
-                console.error('清除数据失败:', err);
-                showToast('清除失败: ' + err.message);
-            }
-        }
-        
-        // ==================== Camera ====================
-        async function initCameraList() {
-            try {
-                try { 
-                    await navigator.mediaDevices.getUserMedia({ video: true }); 
-                } catch (permErr) { 
-                    console.warn('权限获取失败'); 
-                }
-                
-                let videoInputDevices = [];
-                try {
-                    if (typeof ZXing !== 'undefined' && ZXing.BrowserQRCodeReader) {
-                        videoInputDevices = await ZXing.BrowserQRCodeReader.listVideoInputDevices();
-                    }
-                } catch (zxingEnumErr) {
-                    const devices = await navigator.mediaDevices.enumerateDevices();
-                    videoInputDevices = devices.filter(device => device.kind === 'videoinput');
-                }
-
-                const select = document.getElementById('camera-select');
-                select.innerHTML = '<option value="">请选择摄像头...</option>';
-                
-                if (videoInputDevices.length > 0) {
-                    videoInputDevices.forEach((device, index) => {
-                        const option = document.createElement('option');
-                        option.value = device.deviceId;
-                        let label = device.label || `摄像头 ${index + 1}`;
-                        if (label.toLowerCase().includes('rear') || label.toLowerCase().includes('back') || label.includes('后置')) {
-                            label += ' [后置]';
-                            option.selected = true;
-                        }
-                        option.text = label;
-                        select.appendChild(option);
-                    });
-                } else {
-                    select.innerHTML = '<option value="">未找到摄像头设备</option>';
-                }
-            } catch (err) {
-                document.getElementById('camera-select').innerHTML = '<option value="">检测失败</option>';
-            }
-        }
-        
-        async function toggleCamera() {
-            if (isScanning) await stopCamera();
-            else await startCamera();
-        }
-        
-        async function startCamera() {
-            if (typeof ZXing === 'undefined' || !ZXing.BrowserQRCodeReader) {
-                showFloatingMessage('ZXing 库未加载', true);
-                return;
-            }
-            
-            const deviceId = document.getElementById('camera-select').value;
-            try {
-                document.getElementById('btn-start').disabled = true;
-                document.getElementById('scan-btn-text').textContent = '⏳ 启动中...';
-                
-                codeReader = new ZXing.BrowserQRCodeReader({ 
-                    tryHarder: true, 
-                    formats: [ZXing.BarcodeFormat.QR_CODE] 
-                });
-                
-                scanControls = await codeReader.decodeFromVideoDevice(
-                    deviceId || undefined,
-                    document.getElementById('video'),
-                    (result) => {
-                        if (result) handleScanResult(result.getText());
-                    }
-                );
-                
-                isScanning = true;
-                document.getElementById('scan-section-wrapper').classList.add('active');
-                document.getElementById('scan-btn-text').textContent = '⏹️ 停止扫描';
-                document.getElementById('btn-start').disabled = false;
-                showCameraStatus('扫描中... 请对准二维码', 'info');
-                showFloatingMessage('📷 摄像头已启动');
-            } catch (err) {
-                let errorMsg = '启动失败';
-                if (err.name === 'NotAllowedError') errorMsg = '请允许摄像头权限';
-                else if (err.name === 'NotFoundError') errorMsg = '未找到摄像头';
-                else if (err.name === 'NotReadableError') errorMsg = '摄像头被占用';
-                else errorMsg = err.message;
-                
-                showCameraStatus('❌ ' + errorMsg, 'error');
-                showFloatingMessage('⚠️ ' + errorMsg, true);
-                await stopCamera();
-            }
-        }
-        
-        async function stopCamera() {
-            isScanning = false;
-            lastDecodedText = '';
-            
-            if (scanControls?.stop) scanControls.stop();
-            if (codeReader?.reset) codeReader.reset();
-            
-            const video = document.getElementById('video');
-            if (video.srcObject) {
-                video.srcObject.getTracks().forEach(track => track.stop());
-                video.srcObject = null;
-            }
-            
-            scanControls = null;
-            codeReader = null;
-            
-            document.getElementById('scan-section-wrapper').classList.remove('active');
-            document.getElementById('scan-btn-text').textContent = '🚀 开始扫描';
-            document.getElementById('btn-start').disabled = false;
-            showCameraStatus('扫描已停止', 'info');
-        }
-        
-        function handleScanResult(decodedText) {
-            const now = Date.now();
-            if (now - lastScanTime < 1000 && decodedText === lastDecodedText) return;
-            
-            lastScanTime = now;
-            lastDecodedText = decodedText;
-            
-            const scanWindow = document.getElementById('scan-window');
-            scanWindow.classList.add('scan-success');
-            setTimeout(() => scanWindow.classList.remove('scan-success'), 300);
-            
-            processChunkData(decodedText);
-        }
-        
-        // ==================== 核心数据处理函数 ====================
-        async function processChunkData(data) {
-            try {
-                let chunk = (PROTO.parseChunk || function(raw) {
-                    let trimmed = raw.trim();
-                    if (!trimmed.startsWith('{') && trimmed.includes('{')) {
-                        trimmed = trimmed.substring(trimmed.indexOf('{'));
-                    }
-                    if (!trimmed.endsWith('}') && trimmed.includes('}')) {
-                        trimmed = trimmed.substring(0, trimmed.lastIndexOf('}') + 1);
-                    }
-                    if (!trimmed.startsWith('{') || !trimmed.endsWith('}')) {
-                        throw new Error('数据格式错误');
-                    }
-                    return JSON.parse(trimmed);
-                })(data);
-                
-                // 文件名二维码处理
-                if (chunk.t === 'fn') {
-                    if (!chunk.f || !chunk.n || typeof chunk.s !== 'number' || !chunk.h) {
-                        throw new Error('文件名数据字段错误');
-                    }
-                    
-                    // CRC32校验 - 与发送端一致
-                    const crcData = {
-                        t: chunk.t,
-                        f: chunk.f,
-                        n: chunk.n,
-                        s: chunk.s,
-                        ts: chunk.ts,
-                        tc: chunk.tc
-                    };
-                    
-                    if (calculateCRC32(JSON.stringify(crcData)) !== chunk.h.toLowerCase()) {
-                        showFloatingMessage('❌ 文件名校验失败', true);
-                        return;
-                    }
-                    
-                    if (currentFileFingerprint && chunk.f !== currentFileFingerprint) {
-                        showFloatingMessage('⚠️ 文件指纹不匹配', true);
-                        return;
-                    }
-                    
-                    fileInfo = { 
-                        fingerprint: chunk.f, 
-                        filename: decodeFileName(chunk.n), 
-                        totalChunks: chunk.tc, 
-                        size: chunk.s 
-                    };
-                    currentFileFingerprint = chunk.f;
-                    receivedFileName = fileInfo.filename;
-                    
-                    document.getElementById('fingerprint-display').style.display = 'block';
-                    document.getElementById('fingerprint-value').textContent = currentFileFingerprint;
-                    
-                    await saveProgress();
-                    updateUI();
-                    showFloatingMessage('📄 文件名接收成功');
-                    showCameraStatus(`✅ 文件: ${receivedFileName}`, 'success');
-                } else {
-                    // 数据二维码处理
-                    if (typeof chunk.i !== 'number' || !chunk.t || !chunk.d || !chunk.f || !chunk.h) {
-                        throw new Error('数据二维码字段错误');
-                    }
-                    
-                    if (!currentFileFingerprint) {
-                        currentFileFingerprint = chunk.f;
-                        document.getElementById('fingerprint-display').style.display = 'block';
-                        document.getElementById('fingerprint-value').textContent = currentFileFingerprint;
-                    } else if (chunk.f !== currentFileFingerprint) {
-                        showFloatingMessage('⚠️ 二维码不属于当前文件', true);
-                        return;
-                    }
-                    
-                    // CRC32校验 - 对数据字段
-                    if (calculateCRC32(chunk.d) !== chunk.h.toLowerCase()) {
-                        failedChunks.add(chunk.i);
-                        updateUI();
-                        showFloatingMessage(`❌ 分片 ${chunk.i+1} 校验失败`, true);
-                        return;
-                    }
-
-                    failedChunks.delete(chunk.i);
-                    
-                    if (receivedChunks.has(chunk.i)) {
-                        showFloatingMessage(`⚠️ 分片 ${chunk.i+1}/${chunk.t} 已接收过`);
-                        return;
-                    }
-                    
-                    if (!fileInfo) {
-                        fileInfo = { fingerprint: chunk.f, totalChunks: chunk.t, filename: '未知文件', size: 0 };
-                    }
-                    
-                    receivedChunks.set(chunk.i, chunk.d);
-                    await saveProgress();
-                    updateUI();
-                    showFloatingMessage(`✅ 数据分片 ${chunk.i + 1}/${chunk.t} 扫描成功`);
-                    showCameraStatus(`✅ 成功接收数据分片 ${chunk.i + 1}/${fileInfo.totalChunks}`, 'success');
-                }
-                
-                // 检查是否完成
-                if (fileInfo && fileInfo.totalChunks > 0 && receivedChunks.size >= fileInfo.totalChunks) {
-                    document.getElementById('btn-reassemble').disabled = false;
-                    showFloatingMessage(fileInfo.filename !== '未知文件' ? '🎉 接收完成！' : '📦 数据块已全部接收（可重组下载）');
-                    setTimeout(() => stopCamera(), 500);
-                }
-            } catch (err) {
-                console.error('处理失败:', err);
-                showFloatingMessage('❌ ' + err.message, true);
-            }
-        }
-        
-        function showCameraStatus(message, type) {
-            const status = document.getElementById('camera-status');
-            status.textContent = message;
-            status.className = 'status-message show status-' + type;
-        }
-        
-        function showFloatingMessage(message, isError = false) {
-            const msg = document.createElement('div');
-            msg.className = 'floating-message ' + (isError ? 'floating-error' : '');
-            msg.textContent = message;
-            document.body.appendChild(msg);
-            setTimeout(() => msg.remove(), 1500);
-        }
-        
-        // ==================== Virtual Mode ====================
-        function switchMode(mode) {
-            currentMode = mode;
-            document.querySelectorAll('.mode-btn').forEach((btn, idx) => {
-                btn.classList.toggle('active', (mode === 'camera' && idx === 0) || (mode === 'virtual' && idx === 1));
-            });
-            document.getElementById('camera-section').classList.toggle('active', mode === 'camera');
-            document.getElementById('virtual-section').classList.toggle('active', mode === 'virtual');
-            if (mode === 'virtual') stopCamera();
-        }
-        
-        function handleDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('dragover'); }
-        function handleDragLeave(e) { e.currentTarget.classList.remove('dragover'); }
-        
-        function handleDrop(e) {
-            e.preventDefault();
-            e.currentTarget.classList.remove('dragover');
-            addToQueue(Array.from(e.dataTransfer.files).filter(f => f.type.startsWith('image/')));
-        }
-        
-        function handleFileSelect(e) {
-            addToQueue(Array.from(e.target.files));
-            e.target.value = '';
-        }
-        
-        function handlePaste(e) {
-            if (currentMode !== 'virtual') return;
-            const items = Array.from(e.clipboardData.items);
-            const files = items.filter(i => i.type.includes('image')).map(i => new File([i.getAsFile()], `paste-${Date.now()}.png`, { type: i.type }));
-            if (files.length) addToQueue(files);
-        }
-        
-        async function addToQueue(files) {
-            for (const file of files) {
-                const img = new Image();
-                await new Promise((resolve, reject) => { 
-                    img.onload = resolve; 
-                    img.onerror = reject; 
-                    img.src = URL.createObjectURL(file); 
-                });
-                imageQueue.push({ file, img, status: 'pending', result: null });
-            }
-            updateQueueUI();
-            showToast(`已添加 ${files.length} 张图片`);
-            if (currentImageIndex === -1 && imageQueue.length > 0) selectImage(0);
-        }
-        
-        function updateQueueUI() {
-            const container = document.getElementById('queue-list');
-            const completed = imageQueue.filter(i => i.status === 'completed').length;
-            document.getElementById('queue-section').style.display = imageQueue.length > 0 ? 'block' : 'none';
-            document.getElementById('queue-completed').textContent = completed;
-            document.getElementById('queue-total').textContent = imageQueue.length;
-            container.innerHTML = '';
-            imageQueue.forEach((item, idx) => {
-                const el = document.createElement('div');
-                el.className = `queue-item ${item.status} ${idx === currentImageIndex ? 'active' : ''}`;
-                el.innerHTML = `<img src="${item.img.src}"><div class="queue-badge">${idx + 1}</div>`;
-                el.onclick = () => selectImage(idx);
-                container.appendChild(el);
-            });
-        }
-        
-        function selectImage(index) {
-            if (index < 0 || index >= imageQueue.length) return;
-            currentImageIndex = index;
-            displayImage(imageQueue[index]);
-            updateQueueUI();
-        }
-        
-        function displayImage(item) {
-            const container = document.getElementById('preview-container');
-            const canvas = document.getElementById('preview-canvas');
-            const ctx = canvas.getContext('2d');
-            const img = item.img;
-            const scale = Math.min(800 / img.naturalWidth, 1);
-            const width = img.naturalWidth * scale;
-            const height = img.naturalHeight * scale;
-            canvas.width = width;
-            canvas.height = height;
-            ctx.drawImage(img, 0, 0, width, height);
-            container.style.aspectRatio = `${width} / ${height}`;
-            document.getElementById('preview-section').classList.add('active');
-            document.getElementById('current-file').textContent = item.file.name;
-            document.getElementById('current-status').textContent = item.status === 'pending' ? '等待识别' : item.status === 'completed' ? '✓ 已识别' : '✗ 失败';
-        }
-        
-        // ==================== 修复：扫描框区域识别 + 橙色二维码优化 ====================
-        async function scanCurrent() {
-            if (currentImageIndex === -1) return;
-            const item = imageQueue[currentImageIndex];
-            document.getElementById('btn-scan').disabled = true;
-            document.getElementById('btn-scan').textContent = '⏳ 识别中...';
-            
-            try {
-                const canvas = document.getElementById('preview-canvas');
-                const ctx = canvas.getContext('2d');
-                const width = canvas.width;
-                const height = canvas.height;
-                
-                // 提取扫描框区域（70%中心区域）
-                const scanAreaRatio = 0.70;
-                const startX = Math.floor((width * (1 - scanAreaRatio)) / 2);
-                const startY = Math.floor((height * (1 - scanAreaRatio)) / 2);
-                const scanWidth = Math.floor(width * scanAreaRatio);
-                const scanHeight = Math.floor(height * scanAreaRatio);
-                
-                const imageData = ctx.getImageData(startX, startY, scanWidth, scanHeight);
-                
-                // 创建临时canvas
-                const tempCanvas = document.createElement('canvas');
-                tempCanvas.width = scanWidth;
-                tempCanvas.height = scanHeight;
-                const tempCtx = tempCanvas.getContext('2d');
-                tempCtx.putImageData(imageData, 0, 0);
-                
-                let result = null;
-                
-                // 1. 使用ZXing识别
-                if (typeof ZXing !== 'undefined') {
-                    try {
-                        const reader = new ZXing.BrowserQRCodeReader();
-                        const zxingResult = await reader.decodeFromCanvas(tempCanvas);
-                        if (zxingResult) result = zxingResult.getText();
-                    } catch (e) { /* 失败继续 */ }
-                }
-                
-                // 2. 使用jsQR识别
-                if (!result) {
-                    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
-                    if (code) result = code.data;
-                }
-                
-                // 3. 橙色二维码优化：使用高阈值二值化
-                if (!result) {
-                    const orangeOptimizedData = preprocessImageDataWithThreshold(imageData, 200);
-                    const code = jsQR(orangeOptimizedData.data, orangeOptimizedData.width, orangeOptimizedData.height, { inversionAttempts: "attemptBoth" });
-                    if (code) result = code.data;
-                }
-                
-                // 4. 尝试反转颜色
-                if (!result) {
-                    const invertedData = invertImageData(imageData);
-                    const code = jsQR(invertedData.data, invertedData.width, invertedData.height, { inversionAttempts: "attemptBoth" });
-                    if (code) result = code.data;
-                }
-                
-                if (result) {
-                    processChunkData(result);
-                    item.status = 'completed';
-                    setTimeout(() => { 
-                        if (currentImageIndex < imageQueue.length - 1) selectImage(currentImageIndex + 1); 
-                    }, 500);
-                } else {
-                    item.status = 'error';
-                    showToast('未在扫描框区域内识别到二维码');
-                }
-            } catch (err) {
-                console.error('识别错误:', err);
-                item.status = 'error';
-                showToast('识别失败');
-            }
-            
-            document.getElementById('btn-scan').disabled = false;
-            document.getElementById('btn-scan').textContent = '🔍 识别扫描框区域';
-            updateQueueUI();
-            displayImage(item);
-        }
-        
-        // 使用指定阈值进行二值化
-        function preprocessImageDataWithThreshold(imageData, threshold) {
-            const data = new Uint8ClampedArray(imageData.data);
-            const len = data.length;
-            for (let i = 0; i < len; i += 4) {
-                const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-                const val = gray > threshold ? 255 : 0;
-                data[i] = data[i + 1] = data[i + 2] = val;
-            }
-            return new ImageData(data, imageData.width, imageData.height);
-        }
-        
-        // 颜色反转
-        function invertImageData(imageData) {
-            const data = new Uint8ClampedArray(imageData.data);
-            const len = data.length;
-            for (let i = 0; i < len; i += 4) {
-                data[i] = 255 - data[i];
-                data[i + 1] = 255 - data[i + 1];
-                data[i + 2] = 255 - data[i + 2];
-            }
-            return new ImageData(data, imageData.width, imageData.height);
-        }
-        
-        function nextImage() { 
-            if (currentImageIndex < imageQueue.length - 1) selectImage(currentImageIndex + 1); 
-        }
-        
-        function processQueue() {
-            const pending = imageQueue.map((item, idx) => ({ item, idx })).filter(({ item }) => item.status === 'pending');
-            if (pending.length === 0) { showToast('没有待处理的图片'); return; }
-            let index = 0;
-            async function processNext() {
-                if (index >= pending.length) { showToast('队列处理完成'); return; }
-                selectImage(pending[index].idx);
-                await scanCurrent();
-                index++;
-                setTimeout(processNext, 300);
-            }
-            processNext();
-        }
-        
-        function clearQueue() {
-            if (!confirm('确定要清空图片队列吗？（不会清除已接收的数据分片）')) return;
-            imageQueue = [];
-            currentImageIndex = -1;
-            document.getElementById('queue-section').style.display = 'none';
-            document.getElementById('preview-section').classList.remove('active');
-            showToast('队列已清空');
-        }
-        
-        // ==================== Storage & File ====================
-        function updateUI() {
-            if (!fileInfo) return;
-            const totalReceived = receivedChunks.size;
-            const totalToReceive = fileInfo.totalChunks;
-            const pct = totalToReceive > 0 ? Math.round((totalReceived / totalToReceive) * 100) : 0;
-            
-            document.getElementById('progress-fill').style.width = pct + '%';
-            document.getElementById('progress-text').textContent = pct + '%';
-            document.getElementById('status-text').textContent = `${receivedFileName || '未命名'}: ${totalReceived}/${totalToReceive}`;
-            
-            updateChunksDisplay();
-            
-            if (receivedChunks.size >= fileInfo.totalChunks) {
-                document.getElementById('btn-reassemble').disabled = false;
-            }
-        }
-        
-        function updateChunksDisplay() {
-            if (!fileInfo) {
-                document.getElementById('chunks-grid').innerHTML = '<div style="text-align: center; color: var(--text-secondary); padding: 10px; width: 100%;">暂无分片数据</div>';
-                return;
-            }
-            
-            let html = '';
-            for (let i = 0; i < fileInfo.totalChunks; i++) {
-                const isReceived = receivedChunks.has(i);
-                const isFailed = failedChunks.has(i) && !isReceived;
-                const cls = isFailed ? 'crc-fail' : (isReceived ? 'filled' : '');
-                html += `<div class="chunk-cell ${cls}" title="数据分片 ${i + 1}${isFailed ? ' (校验失败需重扫)' : (isReceived ? ' (已接收)' : ' (未接收)')}">${i + 1}</div>`;
-            }
-            if (fileInfo?.filename !== '未知文件') {
-                html += `<div class="chunk-cell filename" title="文件名分片 (已接收)">📄</div>`;
-            }
-            document.getElementById('chunks-grid').innerHTML = html;
-        }
-        
-        async function saveProgress() {
-            try {
-                const store = localforage.createInstance({ name: 'qrcode-receiver-v2' });
-                await store.setItem('chunks', Array.from(receivedChunks.entries()));
-                await store.setItem('fileInfo', fileInfo);
-                await store.setItem('fingerprint', currentFileFingerprint);
-                await store.setItem('filename', receivedFileName);
-            } catch (err) { 
-                console.error('保存失败:', err); 
-            }
-        }
-        
-        async function loadProgress() {
-            try {
-                const store = localforage.createInstance({ name: 'qrcode-receiver-v2' });
-                let chunks = await store.getItem('chunks');
-                let info = await store.getItem('fileInfo');
-                let fp = await store.getItem('fingerprint');
-                let fn = await store.getItem('filename');
-
-                // 迁移 v1 数据
-                if (!info) {
-                    try {
-                        const legacyStore = localforage.createInstance({ name: 'qrcode-receiver' });
-                        const legacyInfo = await legacyStore.getItem('fileInfo');
-                        if (legacyInfo) {
-                            info = legacyInfo;
-                            chunks = await legacyStore.getItem('chunks');
-                            fp = await legacyStore.getItem('fingerprint');
-                            fn = await legacyStore.getItem('filename');
-                            // 保存到 v2
-                            await store.setItem('chunks', chunks);
-                            await store.setItem('fileInfo', info);
-                            await store.setItem('fingerprint', fp);
-                            await store.setItem('filename', fn);
-                            await legacyStore.clear();
-                            console.log('已从 v1 迁移数据到 v2');
-                        }
-                    } catch (e) {
-                        console.log('无 v1 数据或迁移失败:', e.message);
-                    }
-                }
-
-                if (info) {
-                    fileInfo = info;
-                    receivedChunks = new Map(chunks || []);
-                    currentFileFingerprint = fp || info.fingerprint;
-                    receivedFileName = fn || info.filename;
-
-                    document.getElementById('fingerprint-display').style.display = 'block';
-                    document.getElementById('fingerprint-value').textContent = currentFileFingerprint;
-
-                    updateUI();
-
-                    if (receivedChunks.size >= fileInfo.totalChunks) {
-                        document.getElementById('btn-reassemble').disabled = false;
-                    }
-
-                    showToast('✅ 数据已恢复');
-                } else {
-                    showToast('没有保存的数据');
-                }
-            } catch (err) {
-                console.error('加载失败:', err);
-            }
-        }
-        
-        async function reassembleFile() {
-            if (!fileInfo || receivedChunks.size < fileInfo.totalChunks) return;
-            
-            try {
-                document.getElementById('btn-reassemble').disabled = true;
-                document.getElementById('btn-reassemble').textContent = '⏳ 重组中...';
-                
-                const sorted = [];
-                for (let i = 0; i < fileInfo.totalChunks; i++) {
-                    const data = receivedChunks.get(i);
-                    if (!data) throw new Error(`缺少分片 ${i + 1}`);
-                    sorted.push(data);
-                }
-                
-                const combinedBase64 = sorted.join('');
-                let binary = atob(combinedBase64);
-                const bytes = new Uint8Array(binary.length);
-                for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
-                
-                let decompressed;
-                try { 
-                    decompressed = pako.inflate(bytes); 
-                } catch (e) { 
-                    decompressed = bytes; 
-                }
-                
-                const blob = new Blob([decompressed]);
-                const store = localforage.createInstance({ name: 'qrcode-receiver-v2' });
-                await store.setItem('fileBlob', blob);
-                
-                if (fileInfo.filename === '未知文件') {
-                    const now = new Date();
-                    const ts = now.getFullYear() +
-                        String(now.getMonth() + 1).padStart(2, '0') +
-                        String(now.getDate()).padStart(2, '0') + '_' +
-                        String(now.getHours()).padStart(2, '0') +
-                        String(now.getMinutes()).padStart(2, '0') +
-                        String(now.getSeconds()).padStart(2, '0');
-                    fileInfo.filename = 'qrsync_download_' + ts;
-                }
-
-                document.getElementById('btn-download').disabled = false;
-                showToast('✓ 重组完成');
-            } catch (err) {
-                showToast('重组失败: ' + err.message);
-                document.getElementById('btn-reassemble').disabled = false;
-            } finally {
-                document.getElementById('btn-reassemble').textContent = '🧩 重组';
-            }
-        }
-        
-        async function downloadFile() {
-            try {
-                const store = localforage.createInstance({ name: 'qrcode-receiver-v2' });
-                const blob = await store.getItem('fileBlob');
-                if (!blob || !fileInfo) { 
-                    showToast('没有可下载的文件'); 
-                    return; 
-                }
-                
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = fileInfo.filename;
-                a.click();
-                URL.revokeObjectURL(url);
-                showToast('⬇️ 下载已开始');
-            } catch (err) { 
-                showToast('下载失败: ' + err.message); 
-            }
-        }
-        
-        function showToast(msg) {
-            const toast = document.getElementById('toast');
-            toast.textContent = msg;
-            toast.classList.add('show');
-            setTimeout(() => toast.classList.remove('show'), 3000);
-        }
-        
-        window.addEventListener('beforeunload', () => { 
-            if (isScanning) stopCamera(); 
+        // 手写循环比 Uint8Array.from(binary, c=>c.charCodeAt(0)) 快 ~12x（5ms vs 60ms）
+        var _b64decoded = atob(ZXingWasmBase64);
+        ZXingWasmBase64 = null; // base64 字符串已不再需要，立即释放（节省 ~2.8MB）
+        var _wasmArr = new Uint8Array(_b64decoded.length);
+        for (var _i = 0; _i < _b64decoded.length; _i++) _wasmArr[_i] = _b64decoded.charCodeAt(_i);
+        _b64decoded = null;
+        var _wasmBinary = _wasmArr.buffer;
+        _wasmArr = null;
+    </script>
+    <script src="../js/zxing-wasm-reader.js"></script>
+    <script>
+        ZXingWASM.setZXingModuleOverrides({ wasmBinary: _wasmBinary });
+        _wasmBinary = null;
+        // 预热 wasm，标记就绪状态
+        ZXingWASM.readBarcodesFromImageData(
+            { data: new Uint8ClampedArray(4), width: 1, height: 1 },
+            { formats: ['QRCode'] }
+        ).then(() => {
+            ZXingWASM._wasmReady = true;
+            console.log('[zxing-wasm] ✅ 已就绪');
+        }).catch(e => {
+            console.warn('[zxing-wasm] ⚠️ 初始化失败，将使用 jsQR 兜底:', e.message);
         });
     </script>
+
+    <!-- 共享工具函数 -->
+    <script src="../shared/utils.js"></script>
+    <!-- 接收端逻辑 -->
+    <script src="receiver.js"></script>
 </body>
 </html>
