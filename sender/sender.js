@@ -3,7 +3,7 @@ const CONFIG = {
     CHUNK_SIZE: 2100,
     QR_SIZE: 2000,
     QR_MAX_CAPACITY: 2953,
-    AUTOPLAY_INTERVAL: 500,
+    AUTOPLAY_INTERVAL: 350,
     PACKET_TYPES: { DATA: 'data', FILENAME: 'fn' }
 };
 
@@ -117,7 +117,7 @@ function updateChunkEstimation() {
 // ===== 播放间隔 =====
 document.getElementById('intervalConfirmBtn').addEventListener('click', () => {
     const raw = parseInt(document.getElementById('intervalInput').value);
-    CONFIG.AUTOPLAY_INTERVAL = Math.max(100, Math.min(60000, isNaN(raw) ? 500 : raw));
+    CONFIG.AUTOPLAY_INTERVAL = Math.max(100, Math.min(60000, isNaN(raw) ? 350 : raw));
     document.getElementById('intervalInput').value = CONFIG.AUTOPLAY_INTERVAL;
     document.getElementById('intervalAppliedValue').textContent = CONFIG.AUTOPLAY_INTERVAL;
     document.getElementById('intervalAppliedHint').classList.add('show');
