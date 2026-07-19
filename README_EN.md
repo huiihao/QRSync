@@ -227,7 +227,7 @@ See [docs/PACKAGING.md](docs/PACKAGING.md) for instructions on packaging this pr
 | Parameter | Value |
 |-----------|-------|
 | Range | 200 – 2100 bytes |
-| Default | 600 bytes |
+| Default | 2100 bytes |
 | Tip | Smaller chunks improve scan reliability but increase QR count; larger chunks reduce QR count and need a bigger display size |
 
 ### QR Code Dimensions
@@ -235,7 +235,7 @@ See [docs/PACKAGING.md](docs/PACKAGING.md) for instructions on packaging this pr
 | Parameter | Value |
 |-----------|-------|
 | Range | 600 – 2000 pixels |
-| Default | 800 pixels |
+| Default | 2000 pixels |
 | Tip | Adjust to fit the full QR code on screen |
 
 ---
@@ -243,7 +243,7 @@ See [docs/PACKAGING.md](docs/PACKAGING.md) for instructions on packaging this pr
 ## 📝 Notes
 
 1. **Scanning Order** — Scan all data chunks in order, ending with the filename QR code (orange border)
-2. **Chunk Size** — Keep the default 600 bytes; oversized chunks may fail to scan
+2. **Chunk Size** — Default is the maximum 2100 bytes to minimize QR count; reduce it if scanning fails, and keep the QR fully visible on screen
 3. **File Size** — Recommended maximum 10MB; larger files produce many QR codes
 4. **Screen Brightness** — Keep the sender screen at full brightness for best scan reliability
 5. **Camera Focus** — Maintain an appropriate distance between camera and screen

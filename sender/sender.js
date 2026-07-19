@@ -1,7 +1,7 @@
 // ===== 配置 =====
 const CONFIG = {
-    CHUNK_SIZE: 600,
-    QR_SIZE: 800,
+    CHUNK_SIZE: 2100,
+    QR_SIZE: 2000,
     QR_MAX_CAPACITY: 2953,
     AUTOPLAY_INTERVAL: 500,
     PACKET_TYPES: { DATA: 'data', FILENAME: 'fn' }
@@ -464,13 +464,13 @@ resetBtn.addEventListener('click', () => {
     downloadSection.classList.remove('show');
     generateBtn.disabled = true;
 
-    chunkSizeSlider.value = 600;
-    chunkSizeValue.textContent = '600 B';
-    CONFIG.CHUNK_SIZE = 600;
+    chunkSizeSlider.value = 2100;
+    chunkSizeValue.textContent = '2100 B';
+    CONFIG.CHUNK_SIZE = 2100;
 
-    document.getElementById('qrSizeSlider').value = 800;
-    document.getElementById('qrSizeValue').textContent = '800 px';
-    CONFIG.QR_SIZE = 800;
+    document.getElementById('qrSizeSlider').value = 2000;
+    document.getElementById('qrSizeValue').textContent = '2000 px';
+    CONFIG.QR_SIZE = 2000;
 
     hideRegenerateHints();
     document.getElementById('estimatedChunks').textContent = '-- 个';
