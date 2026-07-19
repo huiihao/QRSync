@@ -226,17 +226,17 @@ See [docs/PACKAGING.md](docs/PACKAGING.md) for instructions on packaging this pr
 
 | Parameter | Value |
 |-----------|-------|
-| Range | 400 – 1200 bytes |
+| Range | 200 – 2100 bytes |
 | Default | 600 bytes |
-| Tip | Smaller chunks improve scan reliability but increase QR code count |
+| Tip | Smaller chunks improve scan reliability but increase QR count; larger chunks reduce QR count and need a bigger display size |
 
 ### QR Code Dimensions
 
 | Parameter | Value |
 |-----------|-------|
-| Range | 256 – 800 pixels |
-| Default | 400 pixels |
-| Tip | Adjust based on screen size and scanning distance |
+| Range | 600 – 2000 pixels |
+| Default | 800 pixels |
+| Tip | Adjust to fit the full QR code on screen |
 
 ---
 

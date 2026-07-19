@@ -67,8 +67,8 @@
                     <span class="slider-label">分片大小</span>
                     <span class="slider-value" id="chunkSizeValue">600 B</span>
                 </div>
-                <input type="range" id="chunkSizeSlider" min="200" max="1200" value="600" step="50">
-                <div class="slider-marks"><span>200B</span><span>1200B</span></div>
+                <input type="range" id="chunkSizeSlider" min="200" max="2100" value="600" step="50">
+                <div class="slider-marks"><span>200B</span><span>2100B</span></div>
                 <div class="slider-hint show" id="chunkSizeHint" style="display:none">⚠️ 更改此设置需要重新生成二维码</div>
             </div>
 
@@ -77,8 +77,8 @@
                     <span class="slider-label">二维码尺寸</span>
                     <span class="slider-value" id="qrSizeValue">800 px</span>
                 </div>
-                <input type="range" id="qrSizeSlider" min="600" max="1200" value="800" step="50">
-                <div class="slider-marks"><span>600px</span><span>1200px</span></div>
+                <input type="range" id="qrSizeSlider" min="600" max="2000" value="800" step="50">
+                <div class="slider-marks"><span>600px</span><span>2000px</span></div>
                 <div class="slider-hint" id="qrSizeHint">⚠️ 更改此设置需要重新点击"生成二维码"</div>
             </div>
 
@@ -87,12 +87,12 @@
                     <span class="interval-label">播放间隔</span>
                 </div>
                 <div class="interval-input-row">
-                    <input type="number" class="interval-input" id="intervalInput" min="100" max="60000" value="2000">
+                    <input type="number" class="interval-input" id="intervalInput" min="100" max="60000" value="500">
                     <span class="interval-unit">毫秒</span>
                     <button class="interval-confirm-btn" id="intervalConfirmBtn">确定</button>
                 </div>
                 <div class="interval-applied-hint" id="intervalAppliedHint">
-                    ✅ 已设置为 <span id="intervalAppliedValue">2000</span> ms
+                    ✅ 已设置为 <span id="intervalAppliedValue">500</span> ms
                 </div>
             </div>
 

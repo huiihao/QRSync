@@ -3,7 +3,7 @@ const CONFIG = {
     CHUNK_SIZE: 600,
     QR_SIZE: 800,
     QR_MAX_CAPACITY: 2953,
-    AUTOPLAY_INTERVAL: 2000,
+    AUTOPLAY_INTERVAL: 500,
     PACKET_TYPES: { DATA: 'data', FILENAME: 'fn' }
 };
 
@@ -16,7 +16,7 @@ let originalFileName = '';
 let originalFileSize = 0;
 let qrCodes = [];
 let fileNameQrCode = null;
-let autoplayInterval = null;
+let autoplayTimer = null;
 let isPlaying = false;
 let hasGenerated = false;
 
@@ -117,7 +117,7 @@ function updateChunkEstimation() {
 // ===== 播放间隔 =====
 document.getElementById('intervalConfirmBtn').addEventListener('click', () => {
     const raw = parseInt(document.getElementById('intervalInput').value);
-    CONFIG.AUTOPLAY_INTERVAL = Math.max(100, Math.min(60000, isNaN(raw) ? 2000 : raw));
+    CONFIG.AUTOPLAY_INTERVAL = Math.max(100, Math.min(60000, isNaN(raw) ? 500 : raw));
     document.getElementById('intervalInput').value = CONFIG.AUTOPLAY_INTERVAL;
     document.getElementById('intervalAppliedValue').textContent = CONFIG.AUTOPLAY_INTERVAL;
     document.getElementById('intervalAppliedHint').classList.add('show');
@@ -197,7 +197,7 @@ async function processFileChunks(compressed) {
     const minSafeSize = (17 + 4 * estimatedVersion) * 4;
     if (CONFIG.QR_SIZE < minSafeSize) {
         CONFIG.QR_SIZE = minSafeSize;
-        document.getElementById('qrSizeSlider').value = Math.min(minSafeSize, 1200);
+        document.getElementById('qrSizeSlider').value = Math.min(minSafeSize, parseInt(document.getElementById('qrSizeSlider').max));
         document.getElementById('qrSizeValue').textContent = CONFIG.QR_SIZE + ' px';
     }
 
@@ -227,10 +227,8 @@ function createFileNameQrCode(totalChunks) {
 async function generateQRCodeSequence() {
     qrSection.classList.add('show');
     currentChunkIndex = 0;
-    qrCodes = [
-        ...chunks.map((c, i) => ({ data: c, type: CONFIG.PACKET_TYPES.DATA, index: i })),
-        { data: fileNameQrCode, type: CONFIG.PACKET_TYPES.FILENAME, index: chunks.length }
-    ];
+    qrCodes = chunks.map((c, i) => ({ data: c, type: CONFIG.PACKET_TYPES.DATA, index: i }));
+    qrCodes.push({ data: fileNameQrCode, type: CONFIG.PACKET_TYPES.FILENAME, index: chunks.length });
 
     const totalQR = qrCodes.length;
     document.getElementById('totalQrCount').textContent = totalQR;
@@ -246,23 +244,41 @@ async function generateQRCodeSequence() {
     qrSection.scrollIntoView({ behavior: 'smooth' });
 }
 
-function renderChunksGrid() {
-    chunksGrid.innerHTML = '';
-    chunks.forEach((_, i) => {
-        const dot = document.createElement('div');
-        dot.className = 'chunk-dot pending';
-        dot.textContent = i + 1;
-        dot.id = `chunk-dot-${i}`;
-        dot.onclick = () => { stopAutoplay(); showQRCode(i); };
-        chunksGrid.appendChild(dot);
-    });
+function updateChunkProgress(index) {
+    const total = qrCodes.length;
+    const fill = document.getElementById('chunksProgressFill');
+    const label = document.getElementById('chunksProgressLabel');
+    const jumpInput = document.getElementById('chunkJumpInput');
+    if (fill) fill.style.width = (total > 0 ? (index + 1) / total * 100 : 0) + '%';
+    if (label) label.textContent = `${index + 1} / ${total}`;
+    if (jumpInput) jumpInput.value = String(index + 1);
+}
 
-    const fnDot = document.createElement('div');
-    fnDot.className = 'chunk-dot filename';
-    fnDot.textContent = '📄';
-    fnDot.id = 'chunk-dot-filename';
-    fnDot.onclick = () => { stopAutoplay(); showQRCode(chunks.length); };
-    chunksGrid.appendChild(fnDot);
+function renderChunksGrid() {
+    const total = qrCodes.length;
+    chunksGrid.innerHTML = `
+        <div class="chunks-progress-wrap">
+            <div class="chunks-progress-track">
+                <div class="chunks-progress-fill" id="chunksProgressFill" style="width:0%"></div>
+            </div>
+            <div class="chunks-progress-label" id="chunksProgressLabel">1 / ${total}</div>
+            <div class="chunks-jump-row">
+                <span>跳转到</span>
+                <input type="number" id="chunkJumpInput" min="1" max="${total}" value="1">
+                <button type="button" class="chunks-jump-btn" id="chunkJumpBtn">确定</button>
+            </div>
+        </div>
+    `;
+    const jumpTo = () => {
+        const raw = parseInt(document.getElementById('chunkJumpInput').value, 10);
+        if (isNaN(raw) || raw < 1 || raw > total) return;
+        stopAutoplay();
+        showQRCode(raw - 1);
+    };
+    document.getElementById('chunkJumpBtn').addEventListener('click', jumpTo);
+    document.getElementById('chunkJumpInput').addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') jumpTo();
+    });
 }
 
 function showQRCode(index) {
@@ -270,10 +286,17 @@ function showQRCode(index) {
     const qrData = qrCodes[index];
     const isFilename = qrData.type === CONFIG.PACKET_TYPES.FILENAME;
 
-    qrContainer.innerHTML = '<div id="qrcode"></div>';
     qrContainer.className = isFilename ? 'qr-container filename-qr' : 'qr-container data-qr';
 
-    new QRCode(document.getElementById('qrcode'), {
+    let qrEl = document.getElementById('qrcode');
+    if (!qrEl) {
+        qrContainer.innerHTML = '<div id="qrcode"></div>';
+        qrEl = document.getElementById('qrcode');
+    } else {
+        qrEl.innerHTML = '';
+    }
+
+    new QRCode(qrEl, {
         text: JSON.stringify(qrData.data),
         width: CONFIG.QR_SIZE,
         height: CONFIG.QR_SIZE,
@@ -289,10 +312,7 @@ function showQRCode(index) {
     qrType.className = 'qr-type ' + (isFilename ? 'filename' : 'data');
     document.getElementById('qrHint').textContent = isFilename ? '⚠️ 请最后扫描此二维码' : '请使用接收端扫描此二维码';
 
-    document.querySelectorAll('.chunk-dot').forEach((dot, i) => {
-        dot.classList.remove('generated');
-        if (i === index) dot.classList.add('generated');
-    });
+    updateChunkProgress(index);
 }
 
 // ===== 导航 =====
@@ -314,14 +334,30 @@ const autoplayStatus = document.getElementById('autoplayStatus');
 playBtn.addEventListener('click', () => isPlaying ? stopAutoplay() : startAutoplay());
 autoplayToggle.addEventListener('change', () => autoplayToggle.checked ? startAutoplay() : stopAutoplay());
 
+function clearAutoplayTimer() {
+    if (autoplayTimer !== null) {
+        clearTimeout(autoplayTimer);
+        autoplayTimer = null;
+    }
+}
+
+function scheduleNextAutoplay() {
+    clearAutoplayTimer();
+    autoplayTimer = setTimeout(() => {
+        autoplayTimer = null;
+        if (!isPlaying || !qrCodes.length) return;
+        showQRCode((currentChunkIndex + 1) % qrCodes.length);
+        scheduleNextAutoplay();
+    }, CONFIG.AUTOPLAY_INTERVAL);
+}
+
 function startAutoplay() {
+    if (!qrCodes.length) return;
     isPlaying = true;
     playBtn.textContent = '⏸ 暂停';
     autoplayToggle.checked = true;
     autoplayStatus.textContent = '开启';
-    autoplayInterval = setInterval(() => {
-        showQRCode((currentChunkIndex + 1) % qrCodes.length);
-    }, CONFIG.AUTOPLAY_INTERVAL);
+    scheduleNextAutoplay();
 }
 
 function stopAutoplay() {
@@ -329,15 +365,12 @@ function stopAutoplay() {
     playBtn.textContent = '▶ 播放';
     autoplayToggle.checked = false;
     autoplayStatus.textContent = '关闭';
-    clearInterval(autoplayInterval);
-    autoplayInterval = null;
+    clearAutoplayTimer();
 }
 
 function restartAutoplay() {
-    clearInterval(autoplayInterval);
-    autoplayInterval = setInterval(() => {
-        showQRCode((currentChunkIndex + 1) % qrCodes.length);
-    }, CONFIG.AUTOPLAY_INTERVAL);
+    if (!isPlaying) return;
+    scheduleNextAutoplay();
 }
 
 // ===== 下载 =====
@@ -416,6 +449,7 @@ resetBtn.addEventListener('click', () => {
     file = null; chunks = []; qrCodes = []; currentChunkIndex = 0;
     fileFingerprint = ''; originalFileName = ''; originalFileSize = 0;
     fileNameQrCode = null; hasGenerated = false;
+    chunksGrid.innerHTML = '';
 
     fileInput.value = '';
     uploadArea.classList.remove('has-file');
