@@ -28,8 +28,9 @@ const generateBtn   = document.getElementById('generateBtn');
 const resetBtn      = document.getElementById('resetBtn');
 const qrSection     = document.getElementById('qrSection');
 const qrContainer   = document.getElementById('qrContainer');
-const chunksGrid    = document.getElementById('chunksGrid');
 const downloadSection = document.getElementById('downloadSection');
+const chunkJumpInput = document.getElementById('chunkJumpInput');
+const chunkJumpBtn  = document.getElementById('chunkJumpBtn');
 
 // ===== 파일 업로드 이벤트 =====
 uploadArea.addEventListener('click', () => fileInput.click());
@@ -235,7 +236,7 @@ async function generateQRCodeSequence() {
     document.getElementById('dataQrCount').textContent = chunks.length;
     downloadSection.classList.add('show');
 
-    renderChunksGrid();
+    updateJumpControls(0);
     showQRCode(0);
 
     generateBtn.disabled = false;
@@ -244,42 +245,25 @@ async function generateQRCodeSequence() {
     qrSection.scrollIntoView({ behavior: 'smooth' });
 }
 
-function updateChunkProgress(index) {
+function updateJumpControls(index) {
     const total = qrCodes.length;
-    const fill = document.getElementById('chunksProgressFill');
-    const label = document.getElementById('chunksProgressLabel');
-    const jumpInput = document.getElementById('chunkJumpInput');
-    if (fill) fill.style.width = (total > 0 ? (index + 1) / total * 100 : 0) + '%';
-    if (label) label.textContent = `${index + 1} / ${total}`;
-    if (jumpInput) jumpInput.value = String(index + 1);
+    chunkJumpInput.max = String(Math.max(total, 1));
+    chunkJumpInput.value = String(index + 1);
 }
 
-function renderChunksGrid() {
+function jumpToChunk() {
     const total = qrCodes.length;
-    chunksGrid.innerHTML = `
-        <div class="chunks-progress-wrap">
-            <div class="chunks-progress-track">
-                <div class="chunks-progress-fill" id="chunksProgressFill" style="width:0%"></div>
-            </div>
-            <div class="chunks-progress-label" id="chunksProgressLabel">1 / ${total}</div>
-            <div class="chunks-jump-row">
-                <span>跳转到</span>
-                <input type="number" id="chunkJumpInput" min="1" max="${total}" value="1">
-                <button type="button" class="chunks-jump-btn" id="chunkJumpBtn">确定</button>
-            </div>
-        </div>
-    `;
-    const jumpTo = () => {
-        const raw = parseInt(document.getElementById('chunkJumpInput').value, 10);
-        if (isNaN(raw) || raw < 1 || raw > total) return;
-        stopAutoplay();
-        showQRCode(raw - 1);
-    };
-    document.getElementById('chunkJumpBtn').addEventListener('click', jumpTo);
-    document.getElementById('chunkJumpInput').addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') jumpTo();
-    });
+    if (!total) return;
+    const raw = parseInt(chunkJumpInput.value, 10);
+    if (isNaN(raw) || raw < 1 || raw > total) return;
+    stopAutoplay();
+    showQRCode(raw - 1);
 }
+
+chunkJumpBtn.addEventListener('click', jumpToChunk);
+chunkJumpInput.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') jumpToChunk();
+});
 
 function showQRCode(index) {
     currentChunkIndex = index;
@@ -312,7 +296,7 @@ function showQRCode(index) {
     qrType.className = 'qr-type ' + (isFilename ? 'filename' : 'data');
     document.getElementById('qrHint').textContent = isFilename ? '⚠️ 请最后扫描此二维码' : '请使用接收端扫描此二维码';
 
-    updateChunkProgress(index);
+    updateJumpControls(index);
 }
 
 // ===== 导航 =====
@@ -449,7 +433,6 @@ resetBtn.addEventListener('click', () => {
     file = null; chunks = []; qrCodes = []; currentChunkIndex = 0;
     fileFingerprint = ''; originalFileName = ''; originalFileSize = 0;
     fileNameQrCode = null; hasGenerated = false;
-    chunksGrid.innerHTML = '';
 
     fileInput.value = '';
     uploadArea.classList.remove('has-file');
