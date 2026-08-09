@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="20%" height="20%" alt="QRSync_icon" src="https://github.com/user-attachments/assets/96008e19-31d0-4968-a644-dfdfec30fd53" />
+  <img width="20%" height="20%" alt="QRSync_icon" src="icon/QRSync_icon.png" />
 </p>
 
 <p align="center">
@@ -28,6 +28,7 @@
   <a href="#-why-qrsync">Why QRSync</a> •
   <a href="#-features">Features</a> •
   <a href="#-quick-start">Quick Start</a> •
+  <a href="#-usage">Usage</a> •
   <a href="#-technical-principles">How It Works</a> •
   <a href="#-local-usage">Local Usage</a>
 </p>
@@ -41,7 +42,7 @@
 > Download the repository, load the page, then disconnect — it works fully offline.
 
 <div align="center">
-  <img width="80%" alt="Screenshot" src="https://github.com/user-attachments/assets/90debdb9-1205-4e0b-9ab4-df1aad5f5357" />
+  <img width="80%" alt="Homepage Screenshot" src="docs/screenshots/home.png" />
 </div>
 
 ---
@@ -81,9 +82,9 @@
 
 ## 🚀 Quick Start
 
-**Sender:** Open [Sender](https://huiihao.github.io/QRSync/sender/index.html) → Select file → Click "Generate QR Codes" → Display codes in order
+**Sender:** Open [Sender](https://huiihao.github.io/QRSync/sender/index.html) → Select file → Click "Generate QR Codes" → Enable autoplay or flip manually
 
-**Receiver:** Open [Receiver](https://huiihao.github.io/QRSync/receiver/index.html) → Allow camera → Scan codes in order → Download file
+**Receiver:** Open [Receiver](https://huiihao.github.io/QRSync/receiver/index.html) → Allow camera → Scan data chunks, then the filename chunk → Click "Reassemble & Download"
 
 ---
 
@@ -93,27 +94,46 @@
 
 1. Open the **[Sender Page](https://huiihao.github.io/QRSync/sender/index.html)**
 2. Click or drag to select the file you want to transfer
-3. Adjust chunk size and QR code dimensions (optional; defaults work for most cases)
-4. Click "Generate QR Codes"
-5. Display QR codes in order for the receiver to scan (autoplay available; default interval 500ms)
+3. (Optional) In **Transfer Settings**, adjust:
+   - **Chunk size** (default 2100 B)
+   - **QR size** (default 2000 px)
+   - **Playback interval** (default 500 ms; click Confirm after changing)
+4. Click **Generate QR Codes**
+5. Present the **QR sequence** to the receiver:
+   - Turn on **Autoplay**, or click **Play** to advance by interval
+   - Or use Previous / Next, or **Jump to** a missing chunk index
+6. (Optional) Use **Download All (ZIP)** / **Download Current** to export QR images for offline display or image-recognition mode
+
+> The last frame is the **filename chunk** (orange border); earlier frames are data chunks (cyan border).
 
 <div align="center">
-  <img width="70%" alt="Sender Interface" src="https://github.com/user-attachments/assets/9d414f06-e5d2-4359-9581-79d0a37b3801" />
+  <img width="70%" alt="Sender Interface" src="docs/screenshots/sender.png" />
 </div>
 
 ### 📥 Receiving Files
 
+The receiver supports two modes: **Camera Scan** and **Image Recognition**.
+
+#### Camera Scan
+
 1. Open the **[Receiver Page](https://huiihao.github.io/QRSync/receiver/index.html)**
-2. Click "Start Scanning" and allow camera permissions
-3. Scan all data QR codes in order
-4. Finally scan the filename QR code (identified by an orange border)
-5. Click "Reassemble File"
-6. Click "Download File" to save locally
+2. Keep **Camera Scan** selected; choose a camera (and optional resolution)
+3. Click **Start Scanning** and allow camera permission
+4. Scan the sender screen: preferably all **data chunks** first, then the **filename chunk** (orange border)
+5. When progress shows no missing chunks, click **Reassemble & Download**
+
+> Chunks are stored by index, so data order is not strictly required. If some are missing, jump on the sender and rescan. Progress is restored automatically from IndexedDB after refresh.
 
 <div align="center">
-  <img style="width: 48%;" alt="Receiver Interface 1" src="https://github.com/user-attachments/assets/5fde12d8-f772-496b-a50d-452062d8f0cc" />
-  <img style="width: 48%;" alt="Receiver Interface 2" src="https://github.com/user-attachments/assets/616a5e40-ba18-45c4-9207-7e7c00244b6c" />
+  <img width="70%" alt="Receiver Camera Mode" src="docs/screenshots/receiver-camera.png" />
 </div>
+
+#### Image Recognition
+
+1. Switch to **Image Recognition**
+2. Click / drag / paste (`Ctrl+V` / `⌘+V`) QR images into the queue
+3. Click **Scan** or **Scan All**
+4. When complete, click **Reassemble & Download**
 
 ---
 
@@ -216,7 +236,9 @@ QRSync/
 │   └── localforage.min.js     # Local storage library
 ├── README.md                  # Chinese documentation
 ├── README_EN.md               # English documentation
-└── docs/PACKAGING.md          # Packaging guide
+└── docs/
+    ├── PACKAGING.md           # Packaging guide
+    └── screenshots/           # README screenshots
 ```
 
 > Pure frontend project — no backend dependencies; pages, styles, and logic are modularized, with third-party libraries bundled locally.
@@ -247,7 +269,7 @@ See [docs/PACKAGING.md](docs/PACKAGING.md) for instructions on packaging this pr
 | Default | 2000 pixels |
 | Tip | Adjust to fit the full QR code on screen |
 
-### Autoplay Interval
+### Playback Interval
 
 | Parameter | Value |
 |-----------|-------|
@@ -259,13 +281,14 @@ See [docs/PACKAGING.md](docs/PACKAGING.md) for instructions on packaging this pr
 
 ## 📝 Notes
 
-1. **Scanning Order** — Scan all data chunks in order, ending with the filename QR code (orange border)
+1. **Scanning tips** — Data chunks can be rescanned out of order; scan the filename chunk (orange border) last so the original name is restored
 2. **Chunk Size** — Default is the maximum 2100 bytes to minimize QR count; reduce it if scanning fails, and keep the QR fully visible on screen
-3. **Autoplay** — Default interval is 500ms; increase it if frames are missed, or pause and jump to missing chunks
+3. **Playback interval** — Default is 500ms; increase it if frames are missed, or pause and jump to missing chunks
 4. **File Size** — Recommended maximum 10MB; larger files produce many QR codes
 5. **Screen Brightness** — Keep the sender screen at full brightness for best scan reliability
 6. **Camera Focus** — Maintain an appropriate distance between camera and screen
 7. **Checksum Failure** — If verification fails, simply rescan that QR code
+8. **Download** — When complete, click **Reassemble & Download** only — there is no separate download button
 
 ---
 

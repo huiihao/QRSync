@@ -1,5 +1,5 @@
 <p align="center">
-  <img width="20%" height="20%" alt="QRSync_icon" src="https://github.com/user-attachments/assets/96008e19-31d0-4968-a644-dfdfec30fd53" />
+  <img width="20%" height="20%" alt="QRSync_icon" src="icon/QRSync_icon.png" />
 </p>
 
 <p align="center">
@@ -28,6 +28,7 @@
   <a href="#-为什么选择-qrsync">为什么选择 QRSync</a> •
   <a href="#-功能特点">功能特点</a> •
   <a href="#-快速开始">快速开始</a> •
+  <a href="#-使用方法">使用方法</a> •
   <a href="#-技术原理">技术原理</a> •
   <a href="#-本地使用">本地使用</a>
 </p>
@@ -41,7 +42,7 @@
 > 下载本仓库压缩包，页面加载完成后即可断开网络离线使用。
 
 <div align="center">
-  <img width="80%" alt="Screenshot" src="https://github.com/user-attachments/assets/90debdb9-1205-4e0b-9ab4-df1aad5f5357" />
+  <img width="80%" alt="Homepage Screenshot" src="docs/screenshots/home.png" />
 </div>
 
 ---
@@ -81,9 +82,9 @@
 
 ## 🚀 快速开始
 
-**发送方：** 打开 [发送端](https://huiihao.github.io/QRSync/sender/index.html) → 选择文件 → 点击「生成二维码」→ 按顺序展示二维码
+**发送方：** 打开 [发送端](https://huiihao.github.io/QRSync/sender/index.html) → 选择文件 → 点击「生成二维码」→ 开启自动轮播或手动切换展示
 
-**接收方：** 打开 [接收端](https://huiihao.github.io/QRSync/receiver/index.html) → 允许摄像头权限 → 按顺序扫描二维码 → 下载文件
+**接收方：** 打开 [接收端](https://huiihao.github.io/QRSync/receiver/index.html) → 允许摄像头权限 → 扫描数据分片，最后扫描文件名分片 → 点击「重组并下载」
 
 ---
 
@@ -93,27 +94,46 @@
 
 1. 打开 **[发送端](https://huiihao.github.io/QRSync/sender/index.html)**
 2. 点击或拖拽选择要传输的文件
-3. 调整分片大小和二维码尺寸（可选，默认值适用于大多数场景）
-4. 点击「生成二维码」按钮
-5. 按顺序展示二维码供接收端扫描（可用自动播放，默认间隔 500ms）
+3. （可选）在「传输设置」中调整：
+   - **分片大小**（默认 2100 B）
+   - **二维码尺寸**（默认 2000 px）
+   - **播放间隔**（默认 500 ms，修改后需点「确定」）
+4. 点击「生成二维码」
+5. 在「二维码序列」区域展示给接收端扫描：
+   - 打开 **自动轮播**，或点击「▶ 播放」按间隔自动切换
+   - 也可用「上一个 / 下一个」手动翻页，或用「跳转到」补扫缺失分片
+6. （可选）「下载全部 (ZIP)」/「下载当前」导出二维码图片，便于离线出示或图片识别接收
+
+> 最后一帧是 **文件名分片**（橙色边框）；前面均为数据分片（青色边框）。
 
 <div align="center">
-  <img width="70%" alt="Sender Interface" src="https://github.com/user-attachments/assets/9d414f06-e5d2-4359-9581-79d0a37b3801" />
+  <img width="70%" alt="Sender Interface" src="docs/screenshots/sender.png" />
 </div>
 
 ### 📥 接收文件
 
+接收端支持两种模式：**相机扫描** 与 **图片识别**。
+
+#### 相机扫描
+
 1. 打开 **[接收端](https://huiihao.github.io/QRSync/receiver/index.html)**
-2. 点击「开始扫描」按钮，允许摄像头权限
-3. 按顺序扫描所有数据二维码
-4. 最后扫描文件名二维码（橙色边框标识）
-5. 点击「重组文件」按钮
-6. 点击「下载文件」保存到本地
+2. 保持「相机扫描」模式，选择摄像头（可选分辨率）
+3. 点击「开始扫描」，允许摄像头权限
+4. 对准发送端屏幕扫描：建议先扫完所有 **数据分片**，最后扫 **文件名分片**（橙色边框）
+5. 在「接收进度」中确认已收齐、无缺失后，点击「**重组并下载**」保存文件
+
+> 分片按索引存储，数据分片顺序不严格要求；漏片时可让发送端跳转到对应序号补扫。刷新页面后，已接收进度会从 IndexedDB 自动恢复。
 
 <div align="center">
-  <img style="width: 48%;" alt="Receiver Interface 1" src="https://github.com/user-attachments/assets/5fde12d8-f772-496b-a50d-452062d8f0cc" />
-  <img style="width: 48%;" alt="Receiver Interface 2" src="https://github.com/user-attachments/assets/616a5e40-ba18-45c4-9207-7e7c00244b6c" />
+  <img width="70%" alt="Receiver Camera Mode" src="docs/screenshots/receiver-camera.png" />
 </div>
+
+#### 图片识别
+
+1. 切换到「图片识别」模式
+2. 点击/拖拽/粘贴（`Ctrl+V` / `⌘+V`）二维码图片到队列
+3. 点击「识别」或「全部识别」
+4. 收齐后同样点击「**重组并下载**」
 
 ---
 
@@ -216,7 +236,9 @@ QRSync/
 │   └── localforage.min.js     # 本地存储库
 ├── README.md                  # 中文文档
 ├── README_EN.md               # 英文文档
-└── docs/PACKAGING.md          # 打包说明
+└── docs/
+    ├── PACKAGING.md           # 打包说明
+    └── screenshots/           # README 截图
 ```
 
 > 本项目为纯前端实现，无后端依赖；页面、样式、逻辑已拆分为模块，第三方库均本地化部署。
@@ -247,7 +269,7 @@ QRSync/
 | 默认 | 2000 像素 |
 | 建议 | 根据屏幕尺寸调整，确保单码可完整展示于屏幕内 |
 
-### 自动播放间隔
+### 播放间隔
 
 | 参数 | 说明 |
 |------|------|
@@ -259,13 +281,14 @@ QRSync/
 
 ## 📝 注意事项
 
-1. **扫描顺序** — 请按顺序扫描所有数据分片，最后扫描文件名二维码（橙色边框）
+1. **扫描建议** — 数据分片可乱序补扫；建议最后扫描文件名分片（橙色边框），以便正确恢复文件名
 2. **分片大小** — 默认已为上限 2100 字节以减少二维码数量；若识别困难可适当调小，并保证二维码完整显示在屏幕内
-3. **自动播放** — 默认间隔 500ms；漏片时可适当加大间隔，或暂停后用跳转控件补扫缺失分片
+3. **播放间隔** — 默认 500ms；漏片时可加大间隔，或暂停后用「跳转到」补扫缺失分片
 4. **文件大小** — 建议不超过 10MB，过大文件会生成大量二维码
 5. **屏幕亮度** — 确保发送端屏幕亮度足够，以提高扫描成功率
 6. **摄像头对焦** — 保持手机与屏幕适当距离，确保二维码清晰
 7. **校验失败** — 如遇到校验失败，重新扫描该二维码即可
+8. **下载入口** — 收齐后只需点击「重组并下载」，无需再点单独的下载按钮
 
 ---
 
