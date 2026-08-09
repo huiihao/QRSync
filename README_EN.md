@@ -95,7 +95,7 @@
 2. Click or drag to select the file you want to transfer
 3. Adjust chunk size and QR code dimensions (optional; defaults work for most cases)
 4. Click "Generate QR Codes"
-5. Display QR codes in order for the receiver to scan
+5. Display QR codes in order for the receiver to scan (autoplay available; default interval 500ms)
 
 <div align="center">
   <img width="70%" alt="Sender Interface" src="https://github.com/user-attachments/assets/9d414f06-e5d2-4359-9581-79d0a37b3801" />
@@ -159,7 +159,7 @@
 |---------|---------|-------|
 | Compression | [pako](https://github.com/nodeca/pako) | zlib/deflate in the browser |
 | QR Generation | [qrcode.js](https://github.com/davidshimjs/qrcodejs) | Pure JS QR code rendering |
-| QR Scanning | [ZXing](https://github.com/zxing-js/library) | Multi-format barcode scanner |
+| QR Scanning | [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) + [jsQR](https://github.com/cozmo/jsQR) | Fast WASM decode with jsQR fallback; wasm embedded as base64 for `file://` |
 | Local Storage | [localForage](https://github.com/localForage/localForage) | Async IndexedDB wrapper |
 | Data Integrity | CRC32 | Per-chunk checksum verification |
 
@@ -194,23 +194,32 @@ npx serve .
 
 ```
 QRSync/
-├── index.html               # Entry page
-├── sender/index.html        # Sender page
-├── receiver/index.html      # Receiver page
+├── index.html                 # Entry page
+├── sender/
+│   ├── index.html             # Sender page
+│   ├── sender.css             # Sender styles
+│   └── sender.js              # Sender logic (chunking, generation, autoplay)
+├── receiver/
+│   ├── index.html             # Receiver page
+│   ├── receiver.css           # Receiver styles
+│   └── receiver.js            # Receiver logic (scan, verify, reassemble)
+├── shared/
+│   ├── theme.css              # Shared theme for sender & receiver
+│   └── utils.js               # Shared helpers (CRC32, base64, protocol codec)
 ├── js/
-│   ├── qrcode.min.js        # QR code generation library
-│   ├── pako.min.js          # Compression library
-│   ├── jszip.min.js         # ZIP packaging library
-│   ├── FileSaver.min.js     # File saving library
-│   ├── zxing-library.min.js # QR code scanning library
-│   ├── jsQR.js              # QR code recognition library
-│   └── localforage.min.js   # Local storage library
-├── README.md                # Chinese documentation
-├── README_EN.md             # English documentation
-└── docs/PACKAGING.md        # Packaging guide
+│   ├── qrcode.min.js          # QR code generation library
+│   ├── pako.min.js            # Compression library
+│   ├── jszip.min.js           # ZIP packaging library
+│   ├── zxing-wasm-reader.js   # zxing-wasm decoder
+│   ├── zxing_reader_wasm_b64.js # wasm binary (base64 embedded)
+│   ├── jsQR.js                # QR recognition fallback
+│   └── localforage.min.js     # Local storage library
+├── README.md                  # Chinese documentation
+├── README_EN.md               # English documentation
+└── docs/PACKAGING.md          # Packaging guide
 ```
 
-> Pure frontend project — no backend dependencies, all third-party libraries are bundled locally.
+> Pure frontend project — no backend dependencies; pages, styles, and logic are modularized, with third-party libraries bundled locally.
 
 ---
 
@@ -238,16 +247,25 @@ See [docs/PACKAGING.md](docs/PACKAGING.md) for instructions on packaging this pr
 | Default | 2000 pixels |
 | Tip | Adjust to fit the full QR code on screen |
 
+### Autoplay Interval
+
+| Parameter | Value |
+|-----------|-------|
+| Range | 100 – 60000 ms |
+| Default | 500 ms |
+| Tip | Too short may miss frames; too long slows the whole transfer — tune for your camera and screen |
+
 ---
 
 ## 📝 Notes
 
 1. **Scanning Order** — Scan all data chunks in order, ending with the filename QR code (orange border)
 2. **Chunk Size** — Default is the maximum 2100 bytes to minimize QR count; reduce it if scanning fails, and keep the QR fully visible on screen
-3. **File Size** — Recommended maximum 10MB; larger files produce many QR codes
-4. **Screen Brightness** — Keep the sender screen at full brightness for best scan reliability
-5. **Camera Focus** — Maintain an appropriate distance between camera and screen
-6. **Checksum Failure** — If verification fails, simply rescan that QR code
+3. **Autoplay** — Default interval is 500ms; increase it if frames are missed, or pause and jump to missing chunks
+4. **File Size** — Recommended maximum 10MB; larger files produce many QR codes
+5. **Screen Brightness** — Keep the sender screen at full brightness for best scan reliability
+6. **Camera Focus** — Maintain an appropriate distance between camera and screen
+7. **Checksum Failure** — If verification fails, simply rescan that QR code
 
 ---
 
@@ -282,7 +300,8 @@ This project is open source under the [MIT](LICENSE) license.
 - Reference project [QRBridge](https://github.com/wallechfox/QRBridge) by [@wallechfox](https://github.com/wallechfox)
 - [pako](https://github.com/nodeca/pako) — Fast zlib compression
 - [qrcode.js](https://github.com/davidshimjs/qrcodejs) — QR code generation
-- [ZXing](https://github.com/zxing-js/library) — QR code scanning
+- [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) — WASM-based QR scanning
+- [jsQR](https://github.com/cozmo/jsQR) — QR recognition fallback
 - [localForage](https://github.com/localForage/localForage) — Local storage
 
 ---

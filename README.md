@@ -95,7 +95,7 @@
 2. 点击或拖拽选择要传输的文件
 3. 调整分片大小和二维码尺寸（可选，默认值适用于大多数场景）
 4. 点击「生成二维码」按钮
-5. 按顺序展示二维码供接收端扫描
+5. 按顺序展示二维码供接收端扫描（可用自动播放，默认间隔 500ms）
 
 <div align="center">
   <img width="70%" alt="Sender Interface" src="https://github.com/user-attachments/assets/9d414f06-e5d2-4359-9581-79d0a37b3801" />
@@ -159,7 +159,7 @@
 |------|-----|------|
 | 压缩算法 | [pako](https://github.com/nodeca/pako) | zlib/deflate 浏览器端实现 |
 | 二维码生成 | [qrcode.js](https://github.com/davidshimjs/qrcodejs) | 纯 JS 二维码生成 |
-| 二维码扫描 | [ZXing](https://github.com/zxing-js/library) | 多格式条码扫描 |
+| 二维码扫描 | [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) + [jsQR](https://github.com/cozmo/jsQR) | WASM 高速解码，失败时 jsQR 兜底；wasm 以 base64 内嵌以兼容 `file://` |
 | 本地存储 | [localForage](https://github.com/localForage/localForage) | IndexedDB 异步存储 |
 | 数据校验 | CRC32 | 分片完整性校验 |
 
@@ -194,23 +194,32 @@ npx serve .
 
 ```
 QRSync/
-├── index.html               # 入口页面
-├── sender/index.html        # 发送端
-├── receiver/index.html      # 接收端
+├── index.html                 # 入口页面
+├── sender/
+│   ├── index.html             # 发送端页面
+│   ├── sender.css             # 发送端样式
+│   └── sender.js              # 发送端逻辑（分片、生成、自动播放）
+├── receiver/
+│   ├── index.html             # 接收端页面
+│   ├── receiver.css           # 接收端样式
+│   └── receiver.js            # 接收端逻辑（扫码、校验、重组）
+├── shared/
+│   ├── theme.css              # 收发两端共享主题
+│   └── utils.js               # 共享工具（CRC32、base64、协议编解码等）
 ├── js/
-│   ├── qrcode.min.js        # 二维码生成库
-│   ├── pako.min.js          # 压缩库
-│   ├── jszip.min.js         # ZIP 打包库
-│   ├── FileSaver.min.js     # 文件保存库
-│   ├── zxing-library.min.js # 二维码扫描库
-│   ├── jsQR.js              # 二维码识别库
-│   └── localforage.min.js   # 本地存储库
-├── README.md                # 中文文档
-├── README_EN.md             # 英文文档
-└── docs/PACKAGING.md        # 打包说明
+│   ├── qrcode.min.js          # 二维码生成库
+│   ├── pako.min.js            # 压缩库
+│   ├── jszip.min.js           # ZIP 打包库
+│   ├── zxing-wasm-reader.js   # zxing-wasm 解码器
+│   ├── zxing_reader_wasm_b64.js # wasm 二进制（base64 内嵌）
+│   ├── jsQR.js                # 二维码识别兜底库
+│   └── localforage.min.js     # 本地存储库
+├── README.md                  # 中文文档
+├── README_EN.md               # 英文文档
+└── docs/PACKAGING.md          # 打包说明
 ```
 
-> 本项目为纯前端实现，无后端依赖，所有第三方库均本地化部署。
+> 本项目为纯前端实现，无后端依赖；页面、样式、逻辑已拆分为模块，第三方库均本地化部署。
 
 ---
 
@@ -238,16 +247,25 @@ QRSync/
 | 默认 | 2000 像素 |
 | 建议 | 根据屏幕尺寸调整，确保单码可完整展示于屏幕内 |
 
+### 自动播放间隔
+
+| 参数 | 说明 |
+|------|------|
+| 范围 | 100 – 60000 毫秒 |
+| 默认 | 500 毫秒 |
+| 建议 | 间隔过短易漏扫，过长则整体传输变慢；可按摄像头与屏幕条件微调 |
+
 ---
 
 ## 📝 注意事项
 
 1. **扫描顺序** — 请按顺序扫描所有数据分片，最后扫描文件名二维码（橙色边框）
 2. **分片大小** — 默认已为上限 2100 字节以减少二维码数量；若识别困难可适当调小，并保证二维码完整显示在屏幕内
-3. **文件大小** — 建议不超过 10MB，过大文件会生成大量二维码
-4. **屏幕亮度** — 确保发送端屏幕亮度足够，以提高扫描成功率
-5. **摄像头对焦** — 保持手机与屏幕适当距离，确保二维码清晰
-6. **校验失败** — 如遇到校验失败，重新扫描该二维码即可
+3. **自动播放** — 默认间隔 500ms；漏片时可适当加大间隔，或暂停后用跳转控件补扫缺失分片
+4. **文件大小** — 建议不超过 10MB，过大文件会生成大量二维码
+5. **屏幕亮度** — 确保发送端屏幕亮度足够，以提高扫描成功率
+6. **摄像头对焦** — 保持手机与屏幕适当距离，确保二维码清晰
+7. **校验失败** — 如遇到校验失败，重新扫描该二维码即可
 
 ---
 
@@ -282,7 +300,8 @@ QRSync/
 - 参考项目 [QRBridge](https://github.com/wallechfox/QRBridge) by [@wallechfox](https://github.com/wallechfox)
 - [pako](https://github.com/nodeca/pako) — 快速 zlib 压缩库
 - [qrcode.js](https://github.com/davidshimjs/qrcodejs) — 二维码生成库
-- [ZXing](https://github.com/zxing-js/library) — 二维码扫描库
+- [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) — 基于 WASM 的二维码扫描
+- [jsQR](https://github.com/cozmo/jsQR) — 二维码识别兜底
 - [localForage](https://github.com/localForage/localForage) — 本地存储库
 
 ---
