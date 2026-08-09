@@ -1,0 +1,278 @@
+/* ===== Upload Area ===== */
+.upload-area {
+    border: 2px dashed rgba(0, 212, 255, 0.3);
+    border-radius: 20px;
+    padding: 60px 40px;
+    text-align: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    background: rgba(0, 212, 255, 0.03);
+}
+
+.upload-area:hover,
+.upload-area.dragover {
+    border-color: var(--accent);
+    background: rgba(0, 212, 255, 0.08);
+    transform: translateY(-2px);
+}
+
+.upload-area.has-file {
+    border-color: var(--success);
+    background: rgba(0, 245, 212, 0.08);
+}
+
+.upload-icon { font-size: 56px; margin-bottom: 16px; filter: drop-shadow(0 4px 12px rgba(0, 212, 255, 0.3)); }
+.upload-text { font-size: 20px; font-weight: 600; margin-bottom: 8px; }
+.upload-hint { font-size: 14px; color: var(--text-secondary); }
+
+/* ===== File Info ===== */
+.file-info {
+    margin-top: 24px;
+    padding: 24px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 16px;
+    border: 1px solid var(--border-glass);
+}
+
+.file-info-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 12px 0;
+    border-bottom: 1px solid var(--border-glass);
+}
+
+.file-info-row:last-child { border-bottom: none; }
+.file-info-label { font-size: 14px; color: var(--text-secondary); }
+.file-info-value { font-size: 14px; font-weight: 500; font-family: "SF Mono", monospace; }
+
+.fingerprint {
+    margin-top: 20px;
+    padding: 20px;
+    background: linear-gradient(135deg, rgba(0, 212, 255, 0.1), rgba(123, 44, 191, 0.1));
+    border-radius: 16px;
+    text-align: center;
+    border: 1px solid rgba(0, 212, 255, 0.2);
+}
+
+.fingerprint-label {
+    font-size: 12px;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    margin-bottom: 8px;
+}
+
+.fingerprint-value {
+    font-family: "SF Mono", monospace;
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 4px;
+    text-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+}
+
+/* ===== Interval Setting ===== */
+.interval-container {
+    margin-bottom: 28px;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 20px;
+    border-radius: 16px;
+    border: 1px solid var(--border-glass);
+}
+
+.interval-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.interval-label { font-size: 14px; font-weight: 500; color: var(--text-secondary); }
+
+.interval-input-row { display: flex; align-items: center; gap: 12px; }
+
+.interval-input {
+    flex: 1;
+    height: 44px;
+    padding: 0 16px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid var(--border-glass);
+    border-radius: 10px;
+    font-size: 15px;
+    font-family: "SF Mono", monospace;
+    color: var(--text-primary);
+    outline: none;
+    transition: border-color 0.2s;
+    -webkit-appearance: none;
+}
+
+.interval-input:focus { border-color: rgba(0, 212, 255, 0.5); }
+.interval-unit { font-size: 13px; color: var(--text-secondary); white-space: nowrap; }
+
+.interval-confirm-btn {
+    padding: 10px 20px;
+    background: linear-gradient(135deg, var(--accent), var(--accent-secondary));
+    color: white;
+    border: none;
+    border-radius: 10px;
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+
+.interval-confirm-btn:hover { transform: translateY(-1px); box-shadow: 0 4px 14px rgba(0, 212, 255, 0.35); }
+.interval-confirm-btn:active { transform: translateY(0); }
+
+.interval-applied-hint {
+    font-size: 13px;
+    color: var(--success);
+    margin-top: 8px;
+    text-align: center;
+    display: none;
+}
+
+.interval-applied-hint.show { display: block; }
+
+/* ===== Progress Section ===== */
+.progress-section {
+    margin-top: 24px;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 16px;
+    border: 1px solid var(--border-glass);
+}
+
+.progress-header { display: flex; justify-content: space-between; margin-bottom: 12px; }
+.progress-label { font-size: 14px; color: var(--text-secondary); }
+.progress-value { font-size: 14px; font-weight: 600; color: var(--accent); }
+
+/* ===== QR Display ===== */
+.qr-section { display: none; }
+.qr-section.show { display: block; }
+
+.qr-controls {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    margin-bottom: 32px;
+    flex-wrap: wrap;
+}
+
+.qr-nav-btn {
+    padding: 12px 24px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid var(--border-glass);
+    border-radius: 12px;
+    font-size: 14px;
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.qr-nav-btn:hover:not(:disabled) {
+    background: rgba(0, 212, 255, 0.1);
+    border-color: rgba(0, 212, 255, 0.3);
+}
+
+.qr-nav-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+.qr-display { display: flex; flex-direction: column; align-items: center; gap: 24px; }
+
+.qr-code-block {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.qr-container {
+    padding: 32px;
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    transition: all 0.3s ease;
+    border: 2px solid transparent;
+}
+
+.qr-container.data-qr     { border-color: var(--accent);   box-shadow: 0 8px 32px rgba(0, 212, 255, 0.2); }
+.qr-container.filename-qr { border-color: var(--warning);  box-shadow: 0 8px 32px rgba(255, 159, 28, 0.2); }
+
+#qrcode img, #qrcode canvas { max-width: 100%; height: auto; display: block; }
+
+.qr-info { text-align: center; }
+
+.qr-counter { font-size: 28px; font-weight: 700; margin-bottom: 8px; }
+
+.qr-type {
+    display: inline-block;
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.qr-type.data     { background: rgba(0, 212, 255, 0.15); color: var(--accent);   border: 1px solid rgba(0, 212, 255, 0.3); }
+.qr-type.filename { background: rgba(255, 159, 28, 0.15); color: var(--warning); border: 1px solid rgba(255, 159, 28, 0.3); }
+
+.qr-hint { margin-top: 12px; font-size: 14px; color: var(--text-secondary); }
+
+/* ===== Toggle Section ===== */
+.toggle-section {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    margin-bottom: 24px;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 16px;
+    border: 1px solid var(--border-glass);
+}
+
+.toggle-label { font-size: 14px; color: var(--text-secondary); }
+
+/* ===== Download Section ===== */
+.download-section {
+    margin-top: 24px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border-glass);
+    display: none;
+}
+
+.download-section.show { display: block; }
+.download-info { text-align: center; margin-bottom: 16px; font-size: 14px; color: var(--text-secondary); }
+
+/* ===== Jump Nav ===== */
+.chunks-jump-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+}
+
+.chunks-jump-row input {
+    width: 96px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid var(--border-glass);
+    background: rgba(0, 0, 0, 0.25);
+    color: var(--text-primary);
+    font-family: "SF Mono", monospace;
+}
+
+.chunks-jump-btn {
+    padding: 6px 14px;
+    border-radius: 8px;
+    border: 1px solid var(--border-glass);
+    background: rgba(0, 212, 255, 0.12);
+    color: var(--text-primary);
+    cursor: pointer;
+}
+
+.chunks-jump-btn:hover {
+    border-color: rgba(0, 212, 255, 0.35);
+}
+
+@media (max-width: 734px) {
+    .qr-container { padding: 20px; }
+}

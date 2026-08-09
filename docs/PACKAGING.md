@@ -1,12 +1,14 @@
-# 打包 QRSyncOffline 为可执行文件
+# 打包 QRSync 为可执行文件
 
-本文档介绍如何将 QRSyncOffline 打包为独立的可执行文件，方便在没有浏览器的设备上使用。
+本文档介绍如何将本仓库的纯前端页面打包为独立可执行文件或容器镜像，便于在不便直接使用浏览器的环境中启动。
+
+> 当前项目目录为 `sender/`、`receiver/`、`shared/`、`js/`、`icon/`，下文示例均按此结构编写。请将路径中的 `/path/to/QRSync` 替换为你的实际仓库路径。
 
 ## 方案一：使用 Nativefier（推荐）
 
-[Nativefier](https://github.com/nativefier/nativefier) 是一个将网页应用打包为桌面应用的工具。
+[Nativefier](https://github.com/nativefier/nativefier) 可将网页应用打包为桌面应用。
 
-### 安装 Nativefier
+### 安装
 
 ```bash
 # 需要 Node.js 环境
@@ -18,8 +20,8 @@ npm install -g nativefier
 ```bash
 # 打包发送端
 nativefier \
-  --name "QRSyncOffline-Sender" \
-  --icon "../icon.png" \
+  --name "QRSync-Sender" \
+  --icon "/path/to/QRSync/icon/QRSync_icon.png" \
   --width 1200 \
   --height 800 \
   --min-width 800 \
@@ -27,12 +29,12 @@ nativefier \
   --file-download-options '{"saveAs": true}' \
   --single-instance \
   --tray \
-  "file:///path/to/QRSyncOffline-Fixed/send/index.html"
+  "file:///path/to/QRSync/sender/index.html"
 
 # 打包接收端
 nativefier \
-  --name "QRSyncOffline-Receiver" \
-  --icon "../icon.png" \
+  --name "QRSync-Receiver" \
+  --icon "/path/to/QRSync/icon/QRSync_icon.png" \
   --width 900 \
   --height 800 \
   --min-width 600 \
@@ -40,7 +42,7 @@ nativefier \
   --file-download-options '{"saveAs": true}' \
   --single-instance \
   --tray \
-  "file:///path/to/QRSyncOffline-Fixed/receiver/index.html"
+  "file:///path/to/QRSync/receiver/index.html"
 ```
 
 ### Linux 系统打包
@@ -50,27 +52,30 @@ nativefier \
 sudo apt-get install imagemagick  # Debian/Ubuntu
 sudo yum install ImageMagick        # CentOS/RHEL
 
-# 打包 Linux 版本
+# 打包 Linux 版本（发送端示例）
 nativefier \
   --platform linux \
   --arch x64 \
-  --name "QRSyncOffline-Sender" \
+  --name "QRSync-Sender" \
+  --icon "/path/to/QRSync/icon/QRSync_icon.png" \
   --width 1200 \
   --height 800 \
-  "file:///path/to/QRSyncOffline-Fixed/send/index.html"
+  "file:///path/to/QRSync/sender/index.html"
 ```
 
 ## 方案二：使用 Electron
 
 ### 1. 创建 Electron 项目
 
+在仓库根目录旁或仓库内新建 Electron 工程均可；下列示例假设你把 `main.js` / `package.json` 放在仓库根目录，并直接加载本仓库的 `index.html`。
+
 ```bash
-mkdir qrsync-electron && cd qrsync-electron
 npm init -y
 npm install electron --save-dev
+npm install electron-builder --save-dev
 ```
 
-### 2. 创建主进程文件 (main.js)
+### 2. 主进程文件 (`main.js`)
 
 ```javascript
 const { app, BrowserWindow } = require('electron');
@@ -83,22 +88,18 @@ function createWindow () {
     minWidth: 800,
     minHeight: 600,
     webPreferences: {
-      nodeIntegration: true,
-      contextIsolation: false
+      nodeIntegration: false,
+      contextIsolation: true
     },
-    icon: path.join(__dirname, 'icon.png')
+    icon: path.join(__dirname, 'icon', 'QRSync_icon.png')
   });
 
-  // 加载本地文件
-  mainWindow.loadFile('index.html');
-  
-  // 打开开发者工具（调试用）
-  // mainWindow.webContents.openDevTools();
+  // 加载本仓库入口页（可从首页进入发送端 / 接收端）
+  mainWindow.loadFile(path.join(__dirname, 'index.html'));
 }
 
 app.whenReady().then(() => {
   createWindow();
-  
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
@@ -109,11 +110,11 @@ app.on('window-all-closed', function () {
 });
 ```
 
-### 3. 创建 package.json
+### 3. `package.json` 关键片段
 
 ```json
 {
-  "name": "QRSyncOffline",
+  "name": "qrsync",
   "version": "2.0.0",
   "description": "Offline QR Code File Transfer Tool",
   "main": "main.js",
@@ -129,17 +130,19 @@ app.on('window-all-closed', function () {
     "electron-builder": "^24.0.0"
   },
   "build": {
-    "appId": "com.qrsyncoffline.app",
-    "productName": "QRSyncOffline",
+    "appId": "com.qrsync.app",
+    "productName": "QRSync",
     "directories": {
       "output": "dist"
     },
     "files": [
       "main.js",
       "index.html",
-      "send/**/*",
+      "sender/**/*",
       "receiver/**/*",
-      "js/**/*"
+      "shared/**/*",
+      "js/**/*",
+      "icon/**/*"
     ],
     "mac": {
       "target": "dmg"
@@ -157,16 +160,11 @@ app.on('window-all-closed', function () {
 ### 4. 打包
 
 ```bash
-# 调试运行
-npm start
-
-# 打包所有平台
-npm run build
-
-# 打包特定平台
-npm run build:win    # Windows
-npm run build:mac    # macOS
-npm run build:linux  # Linux
+npm start          # 调试运行
+npm run build      # 打包
+npm run build:win  # Windows
+npm run build:mac  # macOS
+npm run build:linux
 ```
 
 ## 方案三：使用 Tauri（Rust，体积更小）
@@ -174,63 +172,44 @@ npm run build:linux  # Linux
 ### 1. 安装依赖
 
 ```bash
-# 安装 Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-
-# 安装 Tauri CLI
 cargo install tauri-cli
 ```
 
-### 2. 创建项目
+### 2. 创建 / 配置项目
 
-```bash
-cargo create-tauri-app qr-sync-offline
-cd qr-sync-offline
-```
-
-### 3. 配置 tauri.conf.json
+将前端 `distDir` 指向本仓库根目录，开发入口可用首页：
 
 ```json
 {
   "build": {
     "beforeBuildCommand": "",
     "beforeDevCommand": "",
-    "devPath": "../send/index.html",
+    "devPath": "../index.html",
     "distDir": "../"
   },
   "tauri": {
-    "allowlist": {
-      "all": false,
-      "fs": {
-        "all": true
-      },
-      "dialog": {
-        "all": true
-      }
-    },
     "windows": [
       {
-        "title": "QRSyncOffline - Sender",
+        "title": "QRSync",
         "width": 1200,
         "height": 800,
         "resizable": true,
         "fullscreen": false
       }
     ],
-    "security": {
-      "csp": null
-    },
     "bundle": {
       "active": true,
-      "targets": ["deb", "rpm", "appimage", "msi", "dmg"],
-      "identifier": "com.qrsyncoffline.app",
-      "icon": ["icons/32x32.png", "icons/128x128.png", "icons/128x128@2x.png", "icons/icon.icns", "icons/icon.ico"]
+      "identifier": "com.qrsync.app",
+      "icon": ["icons/32x32.png", "icons/128x128.png", "icons/icon.icns", "icons/icon.ico"]
     }
   }
 }
 ```
 
-### 4. 打包
+可将 `icon/QRSync_icon.png` 转换为各平台所需图标后放入 Tauri 的 `icons/` 目录。
+
+### 3. 打包
 
 ```bash
 cargo tauri build
@@ -244,7 +223,9 @@ cargo tauri build
 pip install pywebview pyinstaller
 ```
 
-### 2. 创建启动脚本 (app.py)
+### 2. 启动脚本 (`app.py`)
+
+将脚本放在仓库根目录时，可直接引用相对路径：
 
 ```python
 import webview
@@ -252,83 +233,60 @@ import os
 import sys
 
 def get_resource_path(relative_path):
-    """获取资源路径"""
     if hasattr(sys, '_MEIPASS'):
         return os.path.join(sys._MEIPASS, relative_path)
-    return os.path.join(os.path.abspath("."), relative_path)
+    return os.path.join(os.path.abspath('.'), relative_path)
 
 def main():
-    # 创建发送端窗口
-    sender_window = webview.create_window(
-        'QRSyncOffline - 发送端',
-        get_resource_path('send/index.html'),
+    webview.create_window(
+        'QRSync - 发送端',
+        get_resource_path('sender/index.html'),
         width=1200,
         height=800,
         min_size=(800, 600)
     )
-    
-    # 创建接收端窗口
-    receiver_window = webview.create_window(
-        'QRSyncOffline - 接收端',
+    webview.create_window(
+        'QRSync - 接收端',
         get_resource_path('receiver/index.html'),
         width=900,
         height=800,
         min_size=(600, 600)
     )
-    
     webview.start()
 
 if __name__ == '__main__':
     main()
 ```
 
-### 3. 使用 PyInstaller 打包
+### 3. PyInstaller 打包
+
+需一并打包 `shared/` 与 `icon/`，否则样式与相对资源会缺失：
 
 ```bash
-# 创建 spec 文件
-pyi-makespec --windowed --onefile --add-data "send:send" --add-data "receiver:receiver" --add-data "js:js" --icon=icon.ico app.py
-
-# 打包
-pyinstaller app.spec
-```
-
-### Linux 系统打包
-
-```bash
-# 安装依赖
-sudo apt-get install python3-pip python3-dev
-pip3 install pywebview pyinstaller
-
-# 对于 GTK 后端
-sudo apt-get install python3-gi python3-gi-cairo gir1.2-gtk-3.0 gir1.2-webkit2-4.0
-
-# 打包
 pyinstaller --windowed --onefile \
-  --add-data "send:send" \
+  --add-data "sender:sender" \
   --add-data "receiver:receiver" \
+  --add-data "shared:shared" \
   --add-data "js:js" \
+  --add-data "icon:icon" \
+  --icon=icon/QRSync_icon.png \
   app.py
 ```
 
-## 方案五：使用 Docker + Nginx（服务器部署）
+> Windows 下 `--add-data` 分隔符为 `;`，例如 `--add-data "sender;sender"`。
+
+## 方案五：使用 Docker + Nginx
 
 ```dockerfile
 FROM nginx:alpine
-
 COPY . /usr/share/nginx/html
-
 EXPOSE 80
-
 CMD ["nginx", "-g", "daemon off;"]
 ```
 
 ```bash
-# 构建镜像
-docker build -t qrsyncoffline .
-
-# 运行容器
-docker run -d -p 8080:80 qrsyncoffline
-
+docker build -t qrsync .
+docker run -d -p 8080:80 qrsync
 # 访问 http://localhost:8080
 ```
 
@@ -337,42 +295,32 @@ docker run -d -p 8080:80 qrsyncoffline
 | 方案 | 优点 | 缺点 | 适用场景 |
 |------|------|------|----------|
 | Nativefier | 简单快速 | 包体积较大 | 快速打包 |
-| Electron | 功能强大 | 包体积大 | 复杂应用 |
-| Tauri | 体积小、性能好 | 需要Rust | 追求小体积 |
-| PyWebView | Python生态 | 依赖Python | Python开发者 |
+| Electron | 功能完整 | 包体积大 | 需要桌面集成 |
+| Tauri | 体积小、性能好 | 需要 Rust 工具链 | 追求小体积 |
+| PyWebView | Python 生态 | 依赖 Python 运行时/打包链 | Python 开发者 |
+| Docker | 部署简单 | 仍是浏览器访问形态 | 内网统一托管 |
 
 ## 调试技巧
 
-### 打开开发者工具
-
-大多数方案都支持打开 Chromium 开发者工具：
-
-- **Electron**: 取消注释 `mainWindow.webContents.openDevTools()`
-- **Nativefier**: 打包时添加 `--inject` 参数注入调试脚本
-- **Tauri**: 按 `Ctrl+Shift+I` 或 `F12`
-- **PyWebView**: 设置 `debug=True`
-
-### 查看控制台日志
-
-```javascript
-// 在 HTML 中添加调试日志
-console.log('Debug info:', variable);
-```
+- **Electron**: 可临时调用 `mainWindow.webContents.openDevTools()`
+- **Nativefier**: 按需注入调试脚本
+- **Tauri**: `Ctrl+Shift+I` / `F12`
+- **PyWebView**: `webview.start(debug=True)`
 
 ## 常见问题
 
-### Q: 打包后文件路径错误？
+### Q: 打包后样式丢失或跳转 404？
 
-A: 确保使用相对路径，并在打包配置中正确设置资源目录。
+A: 确认打包配置包含 `sender/`、`receiver/`、`shared/`、`js/`、`icon/`，且页面内使用相对路径。
 
 ### Q: 摄像头无法使用？
 
-A: 需要在打包配置中添加摄像头权限，或使用 HTTPS/localhost。
+A: 桌面壳或浏览器需授予摄像头权限；部分环境要求 `localhost` / HTTPS。`file://` 下能力因浏览器而异。
 
 ### Q: 文件下载失败？
 
-A: 检查打包配置中的文件下载选项，确保 `saveAs` 设置为 `true`。
+A: Nativefier 可设置 `--file-download-options '{"saveAs": true}'`；Electron / 系统壳需允许下载与弹窗。
 
 ---
 
-如有问题，请提交 Issue 或查看各工具的官方文档。
+如有问题，请提交 Issue，或查阅对应打包工具的官方文档。
