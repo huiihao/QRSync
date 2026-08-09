@@ -29,7 +29,7 @@
   <a href="#-features">Features</a> •
   <a href="#-quick-start">Quick Start</a> •
   <a href="#-usage">Usage</a> •
-  <a href="#-technical-principles">How It Works</a> •
+  <a href="#-how-it-works">How It Works</a> •
   <a href="#-local-usage">Local Usage</a>
 </p>
 
@@ -75,6 +75,8 @@
 | 📁 **Any File Type** | Text, images, documents, archives — all supported |
 | 🇨🇳 **Chinese Filename Support** | UTF-8 encoding guarantees no garbled characters |
 | 💾 **Resumable Transfer** | Progress auto-saved to IndexedDB, survives page refresh |
+| 📷 **Camera + Image Modes** | Live camera scanning, or recognize saved / pasted QR images |
+| ▶️ **Autoplay & Jump** | Sender can autoplay by interval and jump to a specific index |
 | 📱 **Mobile Optimized** | UI and interactions tuned for phone camera scanning |
 | 🎨 **Clean Modern UI** | Minimalist design with clear, intuitive workflow |
 
@@ -84,7 +86,7 @@
 
 **Sender:** Open [Sender](https://huiihao.github.io/QRSync/sender/index.html) → Select file → Click "Generate QR Codes" → Enable autoplay or flip manually
 
-**Receiver:** Open [Receiver](https://huiihao.github.io/QRSync/receiver/index.html) → Allow camera → Scan data chunks, then the filename chunk → Click "Reassemble & Download"
+**Receiver:** Open [Receiver](https://huiihao.github.io/QRSync/receiver/index.html) → Allow camera → Scan data chunks and the filename chunk → Click "Reassemble & Download"
 
 ---
 
@@ -98,13 +100,14 @@
    - **Chunk size** (default 2100 B)
    - **QR size** (default 2000 px)
    - **Playback interval** (default 500 ms; click Confirm after changing)
-4. Click **Generate QR Codes**
+4. Click **Generate QR Codes**  
+   > If you change chunk size or QR size after generation, click **Generate QR Codes** again.
 5. Present the **QR sequence** to the receiver:
    - Turn on **Autoplay**, or click **Play** to advance by interval
-   - Or use Previous / Next, or **Jump to** a missing chunk index
+   - Or use Previous / Next, or **Jump to** a sequence index (including the final filename chunk)
 6. (Optional) Use **Download All (ZIP)** / **Download Current** to export QR images for offline display or image-recognition mode
 
-> The last frame is the **filename chunk** (orange border); earlier frames are data chunks (cyan border).
+> The last frame is the **filename chunk** (orange border); earlier frames are data chunks (cyan border). The receiver **must** scan the filename chunk before **Reassemble & Download** is enabled.
 
 <div align="center">
   <img width="70%" alt="Sender Interface" src="docs/screenshots/sender.png" />
@@ -119,10 +122,10 @@ The receiver supports two modes: **Camera Scan** and **Image Recognition**.
 1. Open the **[Receiver Page](https://huiihao.github.io/QRSync/receiver/index.html)**
 2. Keep **Camera Scan** selected; choose a camera (and optional resolution)
 3. Click **Start Scanning** and allow camera permission
-4. Scan the sender screen: preferably all **data chunks** first, then the **filename chunk** (orange border)
+4. Scan the sender screen: data chunks may arrive out of order; you **must** scan the **filename chunk** (orange border) before download is enabled (recommended last)
 5. When progress shows no missing chunks, click **Reassemble & Download**
 
-> Chunks are stored by index, so data order is not strictly required. If some are missing, jump on the sender and rescan. Progress is restored automatically from IndexedDB after refresh.
+> Chunks are stored by index in IndexedDB and restored after refresh. If some are missing, use **Jump to** on the sender and rescan.
 
 <div align="center">
   <img width="70%" alt="Receiver Camera Mode" src="docs/screenshots/receiver-camera.png" />
@@ -133,7 +136,7 @@ The receiver supports two modes: **Camera Scan** and **Image Recognition**.
 1. Switch to **Image Recognition**
 2. Click / drag / paste (`Ctrl+V` / `⌘+V`) QR images into the queue
 3. Click **Scan** or **Scan All**
-4. When complete, click **Reassemble & Download**
+4. After all data chunks and the filename chunk are recognized, click **Reassemble & Download**
 
 ---
 
@@ -152,11 +155,11 @@ The receiver supports two modes: **Camera Scan** and **Image Recognition**.
 **Data Chunks:**
 ```json
 {
-  "i": 0,          // Chunk index
-  "t": 5,          // Total chunks
+  "i": 0,          // Chunk index (0-based)
+  "t": 5,          // Total data chunks
+  "h": "a3f9b",    // CRC32 of the d field
   "f": "ABC12",    // File fingerprint
-  "h": "a3f9b",    // CRC32 checksum
-  "d": "base64…"   // Data payload
+  "d": "base64…"   // Base64 of compressed chunk bytes
 }
 ```
 
@@ -165,11 +168,11 @@ The receiver supports two modes: **Camera Scan** and **Image Recognition**.
 {
   "t": "fn",       // Type identifier (fn = filename)
   "f": "XYZ89",    // File fingerprint
-  "n": "base64…",  // Encoded filename
-  "s": 1024,       // File size (bytes)
-  "ts": 1234567890,// Unix timestamp
-  "tc": 10,        // Total chunk count
-  "h": "abc12"     // CRC32 checksum
+  "n": "base64…",  // Base64-encoded UTF-8 filename
+  "s": 1024,       // Original file size (bytes)
+  "ts": 1234567890,// Unix timestamp (ms)
+  "tc": 10,        // Total data chunk count
+  "h": "abc12"     // CRC32 over the fields above (excluding h)
 }
 ```
 
@@ -180,7 +183,8 @@ The receiver supports two modes: **Camera Scan** and **Image Recognition**.
 | Compression | [pako](https://github.com/nodeca/pako) | zlib/deflate in the browser |
 | QR Generation | [qrcode.js](https://github.com/davidshimjs/qrcodejs) | Pure JS QR code rendering |
 | QR Scanning | [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) + [jsQR](https://github.com/cozmo/jsQR) | Fast WASM decode with jsQR fallback; wasm embedded as base64 for `file://` |
-| Local Storage | [localForage](https://github.com/localForage/localForage) | Async IndexedDB wrapper |
+| ZIP Export | [JSZip](https://github.com/Stuk/jszip) | Packs all QR images for "Download All" |
+| Local Storage | [localForage](https://github.com/localForage/localForage) | Async IndexedDB wrapper (receive progress) |
 | Data Integrity | CRC32 | Per-chunk checksum verification |
 
 ---
@@ -215,6 +219,8 @@ npx serve .
 ```
 QRSync/
 ├── index.html                 # Entry page
+├── icon/
+│   └── QRSync_icon.png        # App icon
 ├── sender/
 │   ├── index.html             # Sender page
 │   ├── sender.css             # Sender styles
@@ -225,7 +231,7 @@ QRSync/
 │   └── receiver.js            # Receiver logic (scan, verify, reassemble)
 ├── shared/
 │   ├── theme.css              # Shared theme for sender & receiver
-│   └── utils.js               # Shared helpers (CRC32, base64, protocol codec)
+│   └── utils.js               # Shared helpers (CRC32, base64, filename codec, download/Toast)
 ├── js/
 │   ├── qrcode.min.js          # QR code generation library
 │   ├── pako.min.js            # Compression library
@@ -234,6 +240,7 @@ QRSync/
 │   ├── zxing_reader_wasm_b64.js # wasm binary (base64 embedded)
 │   ├── jsQR.js                # QR recognition fallback
 │   └── localforage.min.js     # Local storage library
+├── LICENSE                    # MIT license
 ├── README.md                  # Chinese documentation
 ├── README_EN.md               # English documentation
 └── docs/
@@ -281,14 +288,15 @@ See [docs/PACKAGING.md](docs/PACKAGING.md) for instructions on packaging this pr
 
 ## 📝 Notes
 
-1. **Scanning tips** — Data chunks can be rescanned out of order; scan the filename chunk (orange border) last so the original name is restored
-2. **Chunk Size** — Default is the maximum 2100 bytes to minimize QR count; reduce it if scanning fails, and keep the QR fully visible on screen
-3. **Playback interval** — Default is 500ms; increase it if frames are missed, or pause and jump to missing chunks
-4. **File Size** — Recommended maximum 10MB; larger files produce many QR codes
-5. **Screen Brightness** — Keep the sender screen at full brightness for best scan reliability
-6. **Camera Focus** — Maintain an appropriate distance between camera and screen
-7. **Checksum Failure** — If verification fails, simply rescan that QR code
-8. **Download** — When complete, click **Reassemble & Download** only — there is no separate download button
+1. **Filename chunk required** — **Reassemble & Download** stays disabled until the filename chunk is scanned; scan it last (orange border)
+2. **Data chunks may be out of order** — stored by index; use sender **Jump to** to rescan missing ones
+3. **Chunk Size** — Default is the maximum 2100 bytes to minimize QR count; reduce it if scanning fails, and keep the QR fully visible on screen
+4. **Playback interval** — Default is 500ms; increase it if frames are missed, then play again
+5. **File Size** — Recommended maximum 10MB (soft guideline); larger files produce many QR codes and take longer
+6. **Screen Brightness** — Keep the sender screen at full brightness for best scan reliability
+7. **Camera Focus** — Maintain an appropriate distance between camera and screen
+8. **Checksum Failure** — If verification fails, simply rescan that QR code
+9. **Download** — When complete, click **Reassemble & Download** only — there is no separate download button
 
 ---
 
@@ -325,6 +333,7 @@ This project is open source under the [MIT](LICENSE) license.
 - [qrcode.js](https://github.com/davidshimjs/qrcodejs) — QR code generation
 - [zxing-wasm](https://github.com/Sec-ant/zxing-wasm) — WASM-based QR scanning
 - [jsQR](https://github.com/cozmo/jsQR) — QR recognition fallback
+- [JSZip](https://github.com/Stuk/jszip) — ZIP packaging
 - [localForage](https://github.com/localForage/localForage) — Local storage
 
 ---
